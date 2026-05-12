@@ -11,7 +11,7 @@ def logo(picture):
         logo_file = "logos/canon.png"
     elif "IPHONE" in camera_model:
         logo_file = "logos/apple.png"
-    elif "SAMSUNG" in camera_model:
+    elif "SAMSUNG" in camera_model or "SM" in camera_model:
         logo_file = "logos/samsung.png"
 
     return logo_file
