@@ -28,7 +28,7 @@ if uploaded_files is not None:
             picture = Picture(temp_path)
             image = picture.get_image()
             if image is None:
-                raise ValueError("이미지가 손상되었거나 메타데이터가 없습니다.")
+                raise ValueError("이미지를 읽을 수 없습니다.")
 
             width, height = image.size
             thickness = get_thickness(height)
@@ -82,15 +82,31 @@ if uploaded_files is not None:
                     date_y = start_y + size + line_spacing
                     draw.text((info_x, date_y), text_date, fill=(140, 140, 140), font=font_date, anchor="ra")
 
-                if logo_file and os.path.exists(logo_file):
-                    logo_img = Image.open(logo_file).convert("RGBA")
-                    logo_h = int(size * 0.95)
-                    logo_w = int(logo_img.width * (logo_h / logo_img.height))
-                    logo_img = logo_img.resize((logo_w, logo_h), Image.Resampling.LANCZOS)
+                 try:
+                    if l_file and os.path.exists(l_file):
+                        logo_img = Image.open(l_file).convert("RGBA")
+                        logo_h = int(size * 0.95)
+                        logo_w = int(logo_img.width * (logo_h / logo_img.height))
+                        logo_img = logo_img.resize((logo_w, logo_h), Image.Resampling.LANCZOS)
+                        
+                        # 로고 위치 계산을 위한 텍스트 영역 확인
+                        info_bbox = draw.textbbox((info_x, start_y), info, font=f_reg, anchor="ra")
+                        current_left_x = info_bbox[0] - spacing
+                        
+                        # 구분선(Bar) 그리기
+                        bar_h = int(size * 0.7)
+                        draw.line([
+                            (current_left_x, visual_center_y - bar_h // 2),
+                            (current_left_x, visual_center_y + bar_h // 2)
+                        ], fill=(220, 220, 220), width=2)
 
-                    logo_x = int(current_left_x - logo_w)
-                    logo_y = int(visual_center_y - (logo_h // 2))
-                    canvas.paste(logo_img, (logo_x, logo_y), logo_img)
+                        # 로고 붙이기
+                        logo_x = int(current_left_x - spacing - logo_w)
+                        logo_y = int(visual_center_y - (logo_h // 2))
+                        canvas.paste(logo_img, (logo_x, logo_y), logo_img)
+                except Exception as logo_err:
+                    # 로고 로드 실패 시 콘솔에만 출력하고 다음 단계 진행
+                    print(f"로고 로드 실패: {logo_err}")
 
                 return canvas
 
@@ -108,7 +124,6 @@ if uploaded_files is not None:
                 key=unique_id
             )
         except Exception as e:
-            # 메타데이터를 못 읽거나 처리 중 에러가 발생한 파일은 건너뛰고 경고 표시
             st.error(f"⚠️ '{uploaded_file.name}' 처리 중 오류 발생: 메타데이터를 읽을 수 없거나 지원하지 않는 형식입니다. (에러: {e})")
             continue
         st.divider()
