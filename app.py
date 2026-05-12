@@ -25,7 +25,6 @@ if uploaded_files:
             f.write(uploaded_file.getbuffer())
 
         try:
-            # 1. 데이터 불러오기
             picture = Picture(temp_path)
             image = picture.get_image()
             if image is None:
@@ -36,7 +35,6 @@ if uploaded_files:
             padding = get_padding(height)
             logo_file = logo(picture)
 
-            # 2. 테두리 추가 함수
             def add_border(img, w, h, t, p):
                 border_width = w + (t * 2)
                 border_height = h + t + p
@@ -44,7 +42,6 @@ if uploaded_files:
                 canvas.paste(img, (t, t))
                 return canvas
 
-            # 3. 모델명/정보/로고/날짜 배치 함수
             def place_model(canvas, pic, w, h, t, p, l_file):
                 font_obj = set_font(p)
                 font_reg = regular(p)
@@ -57,7 +54,6 @@ if uploaded_files:
                 text_info = f"f/{pic.get_f_number()}  {pic.get_shutter()}  ISO{pic.get_iso()}"
                 text_date = pic.get_datetime()
 
-                # 사진 라인에 맞춘 좌표 설정
                 camera_x = t 
                 info_x = t + w 
 
@@ -68,7 +64,6 @@ if uploaded_files:
                 visual_center_y = int(start_y + (size * 0.52))
                 spacing = int(w * 0.012)
                 
-                # [로고 처리]
                 try:
                     if l_file and os.path.exists(l_file):
                         logo_img = Image.open(l_file).convert("RGBA")
@@ -84,7 +79,6 @@ if uploaded_files:
                 except Exception as logo_err:
                     pass
 
-                # [텍스트 그리기]
                 if text_date:
                     date_y = start_y + size + line_spacing
                     draw.text((info_x, date_y), text_date, fill=(140, 140, 140), font=font_dat, anchor="ra")
@@ -94,13 +88,11 @@ if uploaded_files:
 
                 return canvas
 
-            # 결과물 생성 및 표시
             base_canvas = add_border(image, width, height, thickness, padding)
             final_canvas = place_model(base_canvas, picture, width, height, thickness, padding, logo_file)
 
             st.image(final_canvas, caption=f"결과물: {uploaded_file.name}", use_container_width=True)
 
-            # 다운로드 버튼
             buf = io.BytesIO()
             final_canvas.save(buf, format="JPEG", quality=95)
             st.download_button(
@@ -116,7 +108,6 @@ if uploaded_files:
             
         st.divider()
 
-    # 모든 처리가 끝난 후 임시 파일 일괄 삭제
     for path in temp_file_paths:
         if os.path.exists(path):
             try:
