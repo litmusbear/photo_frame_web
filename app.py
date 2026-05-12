@@ -45,7 +45,7 @@ if uploaded_files:
                 return canvas
 
             # 3. 모델명/정보/로고/날짜 배치 함수
-            def place_model(canvas, pic, w, h, t, p, l_file):
+                        def place_model(canvas, pic, w, h, t, p, l_file):
                 font_obj = set_font(p)
                 font_reg = regular(p)
                 font_dat = date_font(p)
@@ -57,19 +57,20 @@ if uploaded_files:
                 text_info = f"f/{pic.get_f_number()}  {pic.get_shutter()}  ISO{pic.get_iso()}"
                 text_date = pic.get_datetime()
 
-                canvas_width = canvas.size[0]
-                center_y = h + (p // 2)
-                info_x = canvas_width - (t * 2)
-                
+                # --- 중요: 사진 라인에 맞추기 위한 좌표 설정 ---
+                # 사진이 시작되는 왼쪽 끝은 t(thickness)입니다.
+                camera_x = t 
+                # 사진이 끝나는 오른쪽 끝은 t + w 입니다.
+                info_x = t + w 
+                # ------------------------------------------
+
                 line_spacing = int(size * 0.2)
                 total_text_height = size + line_spacing + d_size
                 start_y = h + (p - total_text_height) // 2
+                center_y = h + (p // 2)
                 visual_center_y = int(start_y + (size * 0.52))
                 spacing = int(w * 0.012)
                 
-                # 기기명 시작점 초기화
-                camera_x = t * 2
-
                 # [로고 처리] 기기명 왼쪽에 배치
                 try:
                     if l_file and os.path.exists(l_file):
@@ -85,17 +86,22 @@ if uploaded_files:
                         # 로고 너비만큼 기기명 좌표 이동
                         camera_x = logo_x + logo_w + spacing
                 except Exception as logo_err:
-                    st.warning(f"로고를 불러오는 중 문제가 발생했습니다: {logo_err}")
+                    pass # 로고 실패 시 원래 camera_x(t) 유지
 
                 # [텍스트 그리기]
+                # 날짜 (사진 오른쪽 라인에 맞춤)
                 if text_date:
                     date_y = start_y + size + line_spacing
                     draw.text((info_x, date_y), text_date, fill=(140, 140, 140), font=font_dat, anchor="ra")
 
+                # 기기명 (사진 왼쪽 라인 혹은 로고 옆)
                 draw.text((camera_x, center_y), text_camera, fill=(0, 0, 0), font=font_obj, anchor="lm")
+                
+                # 촬영 정보 (사진 오른쪽 라인에 맞춤)
                 draw.text((info_x, start_y), text_info, fill=(50, 50, 50), font=font_reg, anchor="ra")
 
                 return canvas
+
 
             # 결과물 생성 및 표시
             base_canvas = add_border(image, width, height, thickness, padding)
