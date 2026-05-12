@@ -14,9 +14,12 @@ st.title("📸 폴라로이드 스타일 사진 프레임 생성기")
 uploaded_files = st.file_uploader("사진들을 업로드하세요", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
 
 if uploaded_files is not None:
+    temp_file_paths = []
+
     for uploaded_file in uploaded_files:
         unique_id = uuid.uuid4().hex
         temp_path = f"temp_{unique_id}_{uploaded_file.name}"
+        temp_file_paths.append(temp_path)
 
         with open(temp_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
@@ -24,6 +27,8 @@ if uploaded_files is not None:
         try:
             picture = Picture(temp_path)
             image = picture.get_image()
+            if image is None:
+                raise ValueError("이미지가 손상되었거나 메타데이터가 없습니다.")
 
             width, height = image.size
             thickness = get_thickness(height)
@@ -102,8 +107,15 @@ if uploaded_files is not None:
                 file_name=f"result_{uploaded_file.name}",
                 key=unique_id
             )
-            st.divider()
+        except Exception as e:
+            # 메타데이터를 못 읽거나 처리 중 에러가 발생한 파일은 건너뛰고 경고 표시
+            st.error(f"⚠️ '{uploaded_file.name}' 처리 중 오류 발생: 메타데이터를 읽을 수 없거나 지원하지 않는 형식입니다. (에러: {e})")
+            continue
+        st.divider()
 
-        finally:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
+        for path in temp_file_paths:
+            if os.path.exists(path):
+                try:
+                    os.remove(path)
+                except:
+                    pass
