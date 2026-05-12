@@ -9,21 +9,21 @@ from border import *
 
 st.title("📸 폴라로이드 스타일 사진 프레임 생성기")
 
-uploaded_file = st.file_uploader("사진을 업로드하세요", type=["jpg", "jpeg", "png"])
+uploaded_files = st.file_uploader("사진들을 업로드하세요", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
 
 # app.py 수정 제안 (메모리 직접 처리 방식)
 
-if uploaded_file is not None:
+if uploaded_files is not None:
     # 1. 고유한 ID 생성 및 임시 경로 설정
     import uuid
 
     unique_id = uuid.uuid4().hex
-    original_file_name = uploaded_file.name
+    original_file_name = uploaded_files.name
     temp_path = f"temp_{unique_id}_{original_file_name}"
 
     # 2. 서버에 임시 파일 저장 (EXIF 데이터를 읽기 위해 필요)
     with open(temp_path, "wb") as f:
-        f.write(uploaded_file.getbuffer())
+        f.write(uploaded_files.getbuffer())
 
     # 3. 데이터 객체 생성 및 기본 정보 추출
     picture = Picture(temp_path)
