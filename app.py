@@ -46,7 +46,7 @@ if uploaded_files:
                 return canvas
 
             # 3. 모델명/정보/로고/날짜 배치 함수
-            def place_model(canvas, pic, w, h, t, p, l_file):
+                        def place_model(canvas, pic, w, h, t, p, l_file):
                 font_obj = set_font(p)
                 font_reg = regular(p)
                 font_dat = date_font(p)
@@ -69,41 +69,41 @@ if uploaded_files:
                 visual_center_y = int(start_y + (size * 0.52))
                 spacing = int(w * 0.012)
                 
-                # [날짜 그리기] - 로고 에러와 상관없이 항상 찍히도록 상단 배치
+                # 기기명이 시작될 기본 X 좌표 (왼쪽 여백)
+                camera_x = t * 2
+
+                # [로고 처리] - 기기명 왼쪽 배치를 위해 먼저 계산
+                try:
+                    if l_file and os.path.exists(l_file):
+                        logo_img = Image.open(l_file).convert("RGBA")
+                        logo_h = int(size * 1.1) # 로고 크기를 기기명에 맞춰 살짝 조절
+                        logo_w = int(logo_img.width * (logo_h / logo_img.height))
+                        logo_img = logo_img.resize((logo_w, logo_h), Image.Resampling.LANCZOS)
+                        
+                        # 로고를 왼쪽 여백에 배치
+                        logo_x = camera_x
+                        logo_y = int(center_y - (logo_h // 2))
+                        canvas.paste(logo_img, (logo_x, logo_y), logo_img)
+                        
+                        # 로고가 들어갔으므로 기기명의 시작 위치를 로고 오른쪽으로 이동
+                        camera_x = logo_x + logo_w + spacing
+                except Exception as logo_err:
+                    st.warning(f"로고를 불러오는 중 문제가 발생했습니다: {logo_err}")
+
+                # [텍스트 그리기]
+                # 날짜 (우측 하단)
                 if text_date:
                     date_y = start_y + size + line_spacing
                     draw.text((info_x, date_y), text_date, fill=(140, 140, 140), font=font_dat, anchor="ra")
 
-                # 모델명 및 촬영정보 그리기
-                draw.text((t * 2, center_y), text_camera, fill=(0, 0, 0), font=font_obj, anchor="lm")
+                # 기기명 (로고가 있다면 로고 옆, 없다면 원래 위치)
+                draw.text((camera_x, center_y), text_camera, fill=(0, 0, 0), font=font_obj, anchor="lm")
+                
+                # 촬영 정보 (우측 상단)
                 draw.text((info_x, start_y), text_info, fill=(50, 50, 50), font=font_reg, anchor="ra")
 
-                # [로고 및 구분선 그리기] - 예외 처리 강화
-                try:
-                    if l_file and os.path.exists(l_file):
-                        logo_img = Image.open(l_file).convert("RGBA")
-                        logo_h = int(size * 0.95)
-                        logo_w = int(logo_img.width * (logo_h / logo_img.height))
-                        logo_img = logo_img.resize((logo_w, logo_h), Image.Resampling.LANCZOS)
-                        
-                        info_bbox = draw.textbbox((info_x, start_y), text_info, font=font_reg, anchor="ra")
-                        current_left_x = info_bbox[0] - spacing
-                        
-                        # 구분선
-                        bar_h = int(size * 0.7)
-                        draw.line([
-                            (current_left_x, visual_center_y - bar_h // 2),
-                            (current_left_x, visual_center_y + bar_h // 2)
-                        ], fill=(220, 220, 220), width=2)
-
-                        # 로고 붙이기
-                        logo_x = int(current_left_x - spacing - logo_w)
-                        logo_y = int(visual_center_y - (logo_h // 2))
-                        canvas.paste(logo_img, (logo_x, logo_y), logo_img)
-                except Exception as logo_err:
-                    st.warning(f"로고를 불러오는 중 문제가 발생했습니다: {logo_err}")
-
                 return canvas
+
 
             # 결과물 생성 실행
             base_canvas = add_border(image, width, height, thickness, padding)
