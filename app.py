@@ -39,56 +39,6 @@ if uploaded_file is not None:
     def add_border():
         border_width = width + (thickness * 2)
         border_height = height + thickness + padding
-        canvas = Image.new("RGB", (border_width, border_height), (255, 255, 255))
-        canvas.paste(image, (thickness, thickness))
-        return canvas
-
-
-    def place_model(canvas):
-        font_obj = set_font(padding)
-        font_regular = regular(padding)
-        font_date = date_font(padding)
-        size, date_font_size = font_size(padding)
-
-        draw = ImageDraw.Draw(canvas)
-        canvas_width = canvas.size[0]
-        center_y = height + (padding // 2)
-        info_x = canvas_width - (thickness * 2)
-
-        # ... (중략: 기존의 그리기 로직 그대로 유지) ...
-        # (text_camera, text_info, text_date 등 그리는 부분)
-
-        return canvas
-
-
-    # 5. 실제 실행 (함수 호출)
-    base_canvas = add_border()
-    final_canvas = place_model(base_canvas)
-
-    # 6. 결과 표시
-    st.image(final_canvas, caption="결과물 미리보기", use_container_width=True)
-
-    # 7. 다운로드 버튼 (메모리 버퍼 사용)
-    import io
-
-    buf = io.BytesIO()
-    final_canvas.save(buf, format="JPEG", quality=95)
-
-    st.download_button(
-        label="사진 저장하기",
-        data=buf.getvalue(),
-        file_name=f"result_{unique_id}.jpg",
-        mime="image/jpeg"
-    )
-
-    # 8. 사용 완료된 임시 파일 삭제 (서버 용량 관리)
-    if os.path.exists(temp_path):
-        os.remove(temp_path)
-
-
-    def add_border():
-        border_width = width + (thickness * 2)
-        border_height = height + thickness + padding
 
         canvas = Image.new("RGB", (border_width, border_height), (255, 255, 255))
         canvas.paste(image, (thickness, thickness))
@@ -143,18 +93,33 @@ if uploaded_file is not None:
             logo_y = int(visual_center_y - (logo_h // 2))
             canvas.paste(logo_img, (logo_x, logo_y), logo_img)
 
-        base = os.path.splitext(original_file_name) [0]
+        base = os.path.splitext(original_file_name)[0]
         output_path = f"{base}-watermarked.jpg"
         canvas.save(output_path, quality=95)
         print(f"저장 완료: {output_path}")
         return canvas
 
-    canvas = place_model(add_border())
 
-    st.image(canvas, caption="결과물 미리보기", use_container_width=True)
+    # 5. 실제 실행 (함수 호출)
+    base_canvas = add_border()
+    final_canvas = place_model(base_canvas)
 
+    # 6. 결과 표시
+    st.image(final_canvas, caption="결과물 미리보기", use_container_width=True)
+
+    # 7. 다운로드 버튼 (메모리 버퍼 사용)
     import io
 
     buf = io.BytesIO()
-    canvas.save(buf, format="JPEG", quality=95)
-    st.download_button("사진 저장하기", buf.getvalue(), "result.jpg", "image/jpeg")
+    final_canvas.save(buf, format="JPEG", quality=95)
+
+    st.download_button(
+        label="사진 저장하기",
+        data=buf.getvalue(),
+        file_name=f"result_{unique_id}.jpg",
+        mime="image/jpeg"
+    )
+
+    # 8. 사용 완료된 임시 파일 삭제 (서버 용량 관리)
+    if os.path.exists(temp_path):
+        os.remove(temp_path)
