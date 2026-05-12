@@ -9,7 +9,7 @@ from font import *
 from logo import logo
 from border import *
 
-st.title("📸 필름 스타일 사진 프레임 생성기")
+st.title("📸 폴라로이드 스타일 사진 프레임 생성기")
 
 uploaded_files = st.file_uploader("사진들을 업로드하세요", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
 
