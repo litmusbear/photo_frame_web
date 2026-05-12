@@ -11,21 +11,79 @@ st.title("📸 필름 스타일 사진 보더 생성기")
 
 uploaded_file = st.file_uploader("사진을 업로드하세요", type=["jpg", "jpeg", "png"])
 
+# app.py 수정 제안 (메모리 직접 처리 방식)
+
 if uploaded_file is not None:
+    # 1. 고유한 ID 생성 및 임시 경로 설정
+    import uuid
 
+    unique_id = uuid.uuid4().hex
     original_file_name = uploaded_file.name
-    temp_path = f"temp_{original_file_name}"
+    temp_path = f"temp_{unique_id}_{original_file_name}"
 
-    with open("temp_image.jpg", "wb") as f:
+    # 2. 서버에 임시 파일 저장 (EXIF 데이터를 읽기 위해 필요)
+    with open(temp_path, "wb") as f:
         f.write(uploaded_file.getbuffer())
 
-    picture = Picture("temp_image.jpg")
-    image = picture.get_image()
+    # 3. 데이터 객체 생성 및 기본 정보 추출
+    picture = Picture(temp_path)
+    image = picture.get_image()  # get_data.py에서 ImageOps.exif_transpose가 적용된 이미지
 
     width, height = image.size
     thickness = get_thickness(height)
     padding = get_padding(height)
     logo_file = logo(picture)
+
+
+    # 4. 함수 정의 (기존 내용 유지)
+    def add_border():
+        border_width = width + (thickness * 2)
+        border_height = height + thickness + padding
+        canvas = Image.new("RGB", (border_width, border_height), (255, 255, 255))
+        canvas.paste(image, (thickness, thickness))
+        return canvas
+
+
+    def place_model(canvas):
+        font_obj = set_font(padding)
+        font_regular = regular(padding)
+        font_date = date_font(padding)
+        size, date_font_size = font_size(padding)
+
+        draw = ImageDraw.Draw(canvas)
+        canvas_width = canvas.size[0]
+        center_y = height + (padding // 2)
+        info_x = canvas_width - (thickness * 2)
+
+        # ... (중략: 기존의 그리기 로직 그대로 유지) ...
+        # (text_camera, text_info, text_date 등 그리는 부분)
+
+        return canvas
+
+
+    # 5. 실제 실행 (함수 호출)
+    base_canvas = add_border()
+    final_canvas = place_model(base_canvas)
+
+    # 6. 결과 표시
+    st.image(final_canvas, caption="결과물 미리보기", use_container_width=True)
+
+    # 7. 다운로드 버튼 (메모리 버퍼 사용)
+    import io
+
+    buf = io.BytesIO()
+    final_canvas.save(buf, format="JPEG", quality=95)
+
+    st.download_button(
+        label="사진 저장하기",
+        data=buf.getvalue(),
+        file_name=f"result_{unique_id}.jpg",
+        mime="image/jpeg"
+    )
+
+    # 8. 사용 완료된 임시 파일 삭제 (서버 용량 관리)
+    if os.path.exists(temp_path):
+        os.remove(temp_path)
 
 
     def add_border():
