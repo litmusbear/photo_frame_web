@@ -1,4 +1,4 @@
-from PIL import Image
+from PIL import Image, ImageOps
 from PIL.ExifTags import TAGS
 from datetime import datetime
 from timezonefinder import TimezoneFinder
@@ -80,10 +80,11 @@ def get_datetime(exif):
     return dt.strftime(f"%Y-%B-%d %H:%M {utc_offset_str}")
 
 class Picture():
-    def __init__(self, image_path): # exif 대신 image_path를 받음
+    def __init__(self, image_path):
+        img = Image.open(image_path)
         self.image_path = image_path
-        self.exif = get_exif_data(image_path) # 내부에서 exif 추출
-        self.image = Image.open(image_path)
+        self.exif = get_exif_data(image_path)
+        self.image = self.image = ImageOps.exif_transpose(img)
         self.camera = self.exif.get("Model", "Unknown Camera")
         self.iso = self.exif.get("ISOSpeedRatings", "?")
         self.f_number = self.exif.get("FNumber", "?")
