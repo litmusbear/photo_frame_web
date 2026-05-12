@@ -1,7 +1,7 @@
 import streamlit as st
 from PIL import Image, ImageDraw
 import os
-# 기존 모듈 임포트
+
 from get_data import Picture
 from font import *
 from logo import logo
@@ -95,7 +95,6 @@ if uploaded_file is not None:
 
     st.image(canvas, caption="결과물 미리보기", use_container_width=True)
 
-    # 4. 다운로드 버튼
     import io
 
     buf = io.BytesIO()
