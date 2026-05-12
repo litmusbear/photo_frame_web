@@ -91,7 +91,8 @@ if uploaded_file is not None:
         print(f"저장 완료: {output_path}")
         return canvas
 
-    canvas = add_border()
+    canvas = place_model(add_border())
+
     st.image(canvas, caption="결과물 미리보기", use_container_width=True)
 
     # 4. 다운로드 버튼
