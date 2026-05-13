@@ -60,7 +60,7 @@ if uploaded_files:
                 total_text_height = size + line_spacing + d_size
                 start_y = h + (p - total_text_height) // 2
                 
-                visual_center_y = int(start_y + (size * 0.58)) 
+                visual_center_y = int(start_y + (size * 0.65)) 
                 
                 spacing = int(w * 0.01)
                 current_x = t
