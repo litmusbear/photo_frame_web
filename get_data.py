@@ -77,7 +77,7 @@ def get_datetime(exif):
             minutes = int((utc_offset.total_seconds() % 3600) / 60)
             utc_offset_str = f"UTC{'+' if hours >= 0 else ''}{hours:02d}:{abs(minutes):02d}"
 
-    return dt.strftime(f"%Y-%B-%d %H:%M {utc_offset_str}")
+    return dt.strftime(f"%Y-%b-%d %H:%M {utc_offset_str}")
 
 class Picture():
     def __init__(self, image_path):
