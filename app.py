@@ -14,8 +14,6 @@ st.set_page_config(page_title="폴라로이드 프레임 생성기", layout="cen
 st.title("📸 폴라로이드 스타일 사진 프레임 생성기")
 
 
-# --- [함수 정의 영역] ---
-
 def add_border(img, w, h, t, p):
     border_width = w + (t * 2)
     border_height = h + t + p
@@ -50,7 +48,6 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
             
             gps_info = readable_exif.get("GPSInfo", {})
             coords = None
-            # [🛠️ 오타 수정 완료] ImageDraw 문구를 완벽히 제거하고 and로 정상 연결했습니다.
             if gps_info and 2 in gps_info and 4 in gps_info and gps_info[2] and gps_info[4]:
                 try:
                     def to_degrees(value):
@@ -132,8 +129,6 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
 
     return canvas
 
-
-# --- [메인 구동 영역] ---
 
 uploaded_files = st.file_uploader("사진들을 업로드하세요", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
 
