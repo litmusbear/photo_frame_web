@@ -33,22 +33,22 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     text_camera = pic.get_camera()
     text_info = f"f/{pic.get_f_number()}  {pic.get_shutter()}  ISO{pic.get_iso()}"
     
+    # 1. 타임존 및 날짜 처리 영역 (기존 로직 유지)
     utc_offset_str = chosen_utc if chosen_utc else "UTC+09:00"
     text_date = ""
     date_str = ""
+    has_valid_gps = False
     
     try:
         with Image.open(current_path) as img_exif:
             exif_data = img_exif._getexif()
-        
         if exif_data:
             from PIL.ExifTags import TAGS
             readable_exif = {TAGS.get(tag, tag): val for tag, val in exif_data.items()}
             date_str = readable_exif.get("DateTimeOriginal", "")
-            
             gps_info = readable_exif.get("GPSInfo", {})
             coords = None
-            if gps_info and 2 in gps_info and 4 in gps_info and gps_info[2] and gps_info[4]:
+            if gps_info and 2 in gps_info and 4 in gps_info:
                 try:
                     def to_degrees(value):
                         return float(value[0]) + (float(value[1]) / 60.0) + (float(value[2]) / 3600.0)
@@ -56,11 +56,9 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
                     if readable_exif.get("GPSLatitudeRef", "N") == "S": lat = -lat
                     lon = to_degrees(gps_info[4])
                     if readable_exif.get("GPSLongitudeRef", "E") == "W": lon = -lon
-                    
-                    if lat != 0.0 or lon != 0.0:
+                    if abs(lat) > 0.001 and abs(lon) > 0.001:
                         coords = (lat, lon)
-                except:
-                    coords = None
+                except: coords = None
 
             if coords:
                 try:
@@ -76,34 +74,40 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
                         hours = int(utc_offset.total_seconds() / 3600)
                         minutes = int((utc_offset.total_seconds() % 3600) / 60)
                         utc_offset_str = f"UTC{'+' if hours >= 0 else ''}{hours:02d}:{abs(minutes):02d}"
-                except:
-                    pass
-    except:
-        pass
+                        has_valid_gps = True
+                except: pass
+    except: pass
 
-    if date_str:
+    if has_valid_gps and date_str:
         try:
             dt = datetime.strptime(date_str, "%Y:%m:%d %H:%M:%S")
             text_date = dt.strftime(f"%Y-%b-%d %H:%M {utc_offset_str}")
-        except:
-            date_str = ""
+        except: pass
 
-    if not date_str:
-        try:
-            file_mtime = os.path.getmtime(current_path)
-            dt = datetime.fromtimestamp(file_mtime)
-            text_date = dt.strftime(f"%Y-%b-%d %H:%M {chosen_utc}")
-        except:
-            text_date = datetime.now().strftime(f"%Y-%b-%d %H:%M {chosen_utc}")
+    if not text_date:
+        if date_str:
+            try:
+                dt = datetime.strptime(date_str, "%Y:%m:%d %H:%M:%S")
+                text_date = dt.strftime(f"%Y-%b-%d %H:%M {chosen_utc}")
+            except: date_str = ""
+        if not date_str:
+            try:
+                file_mtime = os.path.getmtime(current_path)
+                dt = datetime.fromtimestamp(file_mtime)
+                text_date = dt.strftime(f"%Y-%b-%d %H:%M {chosen_utc}")
+            except:
+                text_date = datetime.now().strftime(f"%Y-%b-%d %H:%M {chosen_utc}")
 
+    # 2. 레이아웃 좌표 계산 규칙 정의
     line_spacing = int(size * 0.2)
-    total_text_height = size + line_spacing + d_size
-    start_y = h + (p - total_text_height) // 2
+    start_y = h + (p - (size + line_spacing + d_size)) // 2
     visual_center_y = int(start_y + (size * 0.62)) 
     
     spacing = int(w * 0.01)
     current_x = t
 
+    # 로고 계산 영역
+    logo_w = 0
     try:
         if l_file and os.path.exists(l_file):
             logo_img = Image.open(l_file).convert("RGBA")
@@ -116,11 +120,36 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
             canvas.paste(logo_img, (logo_x, logo_y), logo_img)
             
             current_x = logo_x + logo_w + int(spacing * 0.7)
-    except:
-        pass
+    except: pass
 
+    # --- [🛠️ 핵심: 글자 크기 자동 축소 시스템] ---
+    # 우측 정보가 시작되는 안전 한계선(마진 반영) 계산
+    info_x = t + w
+    info_width = draw.textlength(text_info, font=font_reg)
+    max_available_x = info_x - info_width - (spacing * 2)  # 기기명이 침범하면 안 되는 맥시멈 X 좌표
+    
+    # 기기명이 가질 수 있는 최대 허용 가로 폭
+    max_text_width = max_available_x - current_x
+    
+    # 기기명 실제 가로 길이 측정
+    current_text_width = draw.textlength(text_camera, font=font_obj)
+    
+    # 기기명이 너무 길어서 허용치를 넘었다면, 맞춤형 폰트 사이즈로 실시간 축소
+    if current_text_width > max_text_width:
+        # 비율 계산 후 최소 40% 크기까지만 줄어들도록 방어선 구축
+        scale_factor = max(max_text_width / current_text_width, 0.4)
+        new_size = int(size * scale_factor)
+        
+        # 새로운 폰트 객체 생성 (기존 폰트 파일 경로 활용)
+        font_path = font_obj.path if hasattr(font_obj, 'path') else "fonts/CustomFont.ttf" 
+        try:
+            font_obj = ImageFont.truetype(font_path, new_size)
+        except:
+            pass  # 폰트 로드 실패 시 기존 폰트 유지
+    # --------------------------------------------
+
+    # 최종 글자 그리기
     draw.text((int(current_x), int(start_y)), text_camera, fill=(0, 0, 0), font=font_obj, anchor="la")
-    info_x = t + w 
     draw.text((int(info_x), int(start_y)), text_info, fill=(50, 50, 50), font=font_reg, anchor="ra")
 
     if text_date:
@@ -128,7 +157,6 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
         draw.text((int(info_x), date_y), text_date, fill=(140, 140, 140), font=font_dat, anchor="ra")
 
     return canvas
-
 
 uploaded_files = st.file_uploader("사진들을 업로드하세요", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
 
