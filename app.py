@@ -138,4 +138,24 @@ if uploaded_files:
 
             # 이미지 합성 프로세스 실행 (수동 선택한 single_chosen_utc 인자 추가 전달)
             base_canvas = add_border(image, width, height, thickness, padding)
-            final_canvas = place_model(base_canvas, picture, width, height,
+            final_canvas = place_model(base_canvas, picture, width, height, thickness, padding, logo_file, single_chosen_utc)
+
+            st.image(final_canvas, caption=f"완성된 이미지: {uploaded_file.name}", use_container_width=True)
+
+            buf = io.BytesIO()
+            final_canvas.save(buf, format="JPEG", quality=95)
+            st.download_button(
+                label=f"💾 {uploaded_file.name} 저장하기",
+                data=buf.getvalue(),
+                file_name=f"polaroid_{uploaded_file.name}",
+                key=f"btn_{unique_id}"
+            )
+            
+        except Exception as e:
+            st.error(f"⚠️ '{uploaded_file.name}' 처리 중 오류 발생: {e}")
+            
+        st.divider()
+
+    for path in temp_file_paths:
+        if os.path.exists(path):
+            os.remove(path)
