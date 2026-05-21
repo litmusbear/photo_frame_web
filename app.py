@@ -34,10 +34,11 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     text_camera = pic.get_camera()
     text_info = f"f/{pic.get_f_number()}  {pic.get_shutter()}  ISO{pic.get_iso()}"
     
-    # 사용자가 UI에서 최종 선택한 타임존을 기본값으로 지정
+    # 1. 기본값으로 사용자가 지정한 타임존 준비 (GPS가 없을 때를 대비)
     utc_offset_str = chosen_utc if chosen_utc else "UTC+09:00"
     text_date = ""
     date_str = ""
+    has_valid_gps = False
     
     try:
         exif_data = pic.image._getexif() if hasattr(pic, 'image') else None
@@ -50,7 +51,7 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
             readable_exif = {TAGS.get(tag, tag): val for tag, val in exif_data.items()}
             date_str = readable_exif.get("DateTimeOriginal", "")
             
-            # GPS 데이터 알맹이 검증
+            # GPS 데이터 알맹이 존재 여부 검증
             gps_info = readable_exif.get("GPSInfo", {})
             coords = None
             if gps_info and 2 in gps_info and 4 in gps_info and gps_info[2] and gps_info[4]:
@@ -67,7 +68,7 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
                 except:
                     coords = None
             
-            # 유효한 GPS가 있을 때만 동적 연산으로 수동 선택 무시
+            # [핵심 변경] 진짜 유효한 GPS 좌표가 매핑되었다면 자동 연산 타임존 우선 적용!
             if coords:
                 try:
                     from timezonefinder import TimezoneFinder
@@ -82,34 +83,46 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
                         hours = int(utc_offset.total_seconds() / 3600)
                         minutes = int((utc_offset.total_seconds() % 3600) / 60)
                         utc_offset_str = f"UTC{'+' if hours >= 0 else ''}{hours:02d}:{abs(minutes):02d}"
+                        has_valid_gps = True  # 진짜 GPS로 타임존 구하는 데 성공했음을 표시!
                 except:
                     pass
     except:
         pass
 
-    # 날짜 조립 및 null 예외 처리 강제 덮어쓰기
+    # --- [조립 및 예외 처리 영역] ---
     from datetime import datetime
     
-    if date_str:
+    # 1. 진짜 GPS 데이터 연산에 성공했다면 수동 선택값은 쳐다보지도 않고 자동 타임존 적용
+    if has_valid_gps and date_str:
         try:
             dt = datetime.strptime(date_str, "%Y:%m:%d %H:%M:%S")
             text_date = dt.strftime(f"%Y-%b-%d %H:%M {utc_offset_str}")
         except:
-            date_str = ""
+            pass
 
-    if not date_str:
-        try:
-            orig_date = pic.get_datetime() 
-            if orig_date and "UTC" in orig_date:
-                base_part = orig_date.split("UTC")[0].strip()
-                text_date = f"{base_part} {utc_offset_str}"
-            else:
-                file_mtime = os.path.getmtime(current_path)
-                dt = datetime.fromtimestamp(file_mtime)
-                text_date = dt.strftime(f"%Y-%b-%d %H:%M {utc_offset_str}")
-        except:
-            dt = datetime.now()
-            text_date = dt.strftime(f"%Y-%b-%d %H:%M {utc_offset_str}")
+    # 2. GPS가 없거나(라이카) 메타데이터가 완전히 깨진(null) 경우에만 수동 선택값 강제 결합
+    if not text_date:
+        if date_str:
+            try:
+                dt = datetime.strptime(date_str, "%Y:%m:%d %H:%M:%S")
+                text_date = dt.strftime(f"%Y-%b-%d %H:%M {chosen_utc}") # 화면에서 고른 값 그대로 사용
+            except:
+                date_str = ""
+
+        if not date_str:
+            try:
+                orig_date = pic.get_datetime() 
+                if orig_date and "UTC" in orig_date:
+                    base_part = orig_date.split("UTC")[0].strip()
+                    text_date = f"{base_part} {chosen_utc}"
+                else:
+                    file_mtime = os.path.getmtime(current_path)
+                    dt = datetime.fromtimestamp(file_mtime)
+                    text_date = dt.strftime(f"%Y-%b-%d %H:%M {chosen_utc}")
+            except:
+                dt = datetime.now()
+                text_date = dt.strftime(f"%Y-%b-%d %H:%M {chosen_utc}")
+    # ---------------------------------------------------------------------
 
     # 레이아웃 정렬 및 이미지 합성
     line_spacing = int(size * 0.2)
@@ -185,13 +198,9 @@ if uploaded_files:
 
             st.subheader(f"🖼️ 파일: {uploaded_file.name}")
             
-            # [핵심 수정] 타임존 선택지 정의
             tz_options = ["UTC+09:00 (한국/일본)", "UTC+01:00 (유럽 서부)", "UTC+00:00 (런던/GMT)", "UTC-05:00 (뉴욕/동부)"]
-            
-            # session_state에 기억된 인덱스 계산
             current_index = tz_options.index(st.session_state[file_id])
 
-            # selectbox 조작 시 session_state를 즉시 갱신하도록 콜백 함수 연결
             def update_tz(fid=file_id, uid=unique_id):
                 st.session_state[fid] = st.session_state[f"selectbox_{uid}"]
 
@@ -203,7 +212,6 @@ if uploaded_files:
                 on_change=update_tz
             )
             
-            # 최종 선택된 값에서 문자열 슬라이싱 ("UTC+01:00" 형태 추출)
             single_chosen_utc = st.session_state[file_id].split(" ")[0]
 
             # 이미지 프레임 합성
