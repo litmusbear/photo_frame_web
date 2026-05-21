@@ -23,7 +23,7 @@ def add_border(img, w, h, t, p):
 
 
 def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=None):
-    font_obj = set_font(p)
+    font_obj = set_font(p)  # 이게 본래 볼드체 폰트 객체일 것입니다.
     font_reg = regular(p)
     font_dat = date_font(p)
     size, d_size = font_size(p)
@@ -33,7 +33,7 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     text_camera = pic.get_camera()
     text_info = f"f/{pic.get_f_number()}  {pic.get_shutter()}  ISO{pic.get_iso()}"
     
-    # 1. 타임존 및 날짜 처리 영역 (기존 로직 유지)
+    # 1. 타임존 및 날짜 영역 (기존 유지)
     utc_offset_str = chosen_utc if chosen_utc else "UTC+09:00"
     text_date = ""
     date_str = ""
@@ -98,7 +98,7 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
             except:
                 text_date = datetime.now().strftime(f"%Y-%b-%d %H:%M {chosen_utc}")
 
-    # 2. 레이아웃 좌표 계산 규칙 정의
+    # 레이아웃 좌표 계산
     line_spacing = int(size * 0.2)
     start_y = h + (p - (size + line_spacing + d_size)) // 2
     visual_center_y = int(start_y + (size * 0.62)) 
@@ -106,8 +106,7 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     spacing = int(w * 0.01)
     current_x = t
 
-    # 로고 계산 영역
-    logo_w = 0
+    # 로고 계산
     try:
         if l_file and os.path.exists(l_file):
             logo_img = Image.open(l_file).convert("RGBA")
@@ -122,34 +121,43 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
             current_x = logo_x + logo_w + int(spacing * 0.7)
     except: pass
 
-    # --- [🛠️ 핵심: 글자 크기 자동 축소 시스템] ---
-    # 우측 정보가 시작되는 안전 한계선(마진 반영) 계산
+    # --- [🛠️ 굵기 보존형 실시간 스케일링 로직] ---
     info_x = t + w
     info_width = draw.textlength(text_info, font=font_reg)
-    max_available_x = info_x - info_width - (spacing * 2)  # 기기명이 침범하면 안 되는 맥시멈 X 좌표
-    
-    # 기기명이 가질 수 있는 최대 허용 가로 폭
+    max_available_x = info_x - info_width - (spacing * 2)
     max_text_width = max_available_x - current_x
-    
-    # 기기명 실제 가로 길이 측정
     current_text_width = draw.textlength(text_camera, font=font_obj)
     
-    # 기기명이 너무 길어서 허용치를 넘었다면, 맞춤형 폰트 사이즈로 실시간 축소
+    # 억지 굵기(스트로크) 기본값
+    camera_stroke_width = 0
+    
     if current_text_width > max_text_width:
-        # 비율 계산 후 최소 40% 크기까지만 줄어들도록 방어선 구축
         scale_factor = max(max_text_width / current_text_width, 0.4)
         new_size = int(size * scale_factor)
         
-        # 새로운 폰트 객체 생성 (기존 폰트 파일 경로 활용)
+        # [처방 1] 기존 font_obj가 가지고 있던 볼드체 폰트 파일 경로를 정확히 유지하면서 크기만 분양
         font_path = font_obj.path if hasattr(font_obj, 'path') else "fonts/CustomFont.ttf" 
         try:
             font_obj = ImageFont.truetype(font_path, new_size)
         except:
-            pass  # 폰트 로드 실패 시 기존 폰트 유지
+            pass
+        
+        # [처방 2] 글자가 많이 작아졌을 경우(비율 85% 이하) 텍스트 외곽선 두께를 주어 강제로 볼드하게 만듦
+        if scale_factor < 0.85:
+            camera_stroke_width = max(1, int(new_size * 0.04))  # 폰트 크기에 비례하여 굵기 제어
     # --------------------------------------------
 
-    # 최종 글자 그리기
-    draw.text((int(current_x), int(start_y)), text_camera, fill=(0, 0, 0), font=font_obj, anchor="la")
+    # 최종 글자 그리기 (stroke 속성 추가)
+    draw.text(
+        (int(current_x), int(start_y)), 
+        text_camera, 
+        fill=(0, 0, 0), 
+        font=font_obj, 
+        anchor="la",
+        stroke_width=camera_stroke_width,  # 👈 작아지면 작동하는 페이크 볼드 두께
+        stroke_fill=(0, 0, 0)              # 👈 외곽선 색상도 검은색으로 통일
+    )
+    
     draw.text((int(info_x), int(start_y)), text_info, fill=(50, 50, 50), font=font_reg, anchor="ra")
 
     if text_date:
