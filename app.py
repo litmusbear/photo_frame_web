@@ -34,6 +34,7 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     text_camera = pic.get_camera()
     text_info = f"f/{pic.get_f_number()}  {pic.get_shutter()}  ISO{pic.get_iso()}"
     
+    # 1. 날짜 및 타임존 문자열 직접 생성 시작
     text_date = ""
     try:
         exif_data = pic.image._getexif() if hasattr(pic, 'image') else None
@@ -53,14 +54,12 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
                 
                 dt = datetime.strptime(date_str, "%Y:%m:%d %H:%M:%S")
                 
-                # [핵심 수정] 사용자가 선택한 타임존을 우선 기본값으로 완벽하게 고정
+                # 사용자가 UI에서 고른 수동 타임존을 '절대적 기본값'으로 세팅
                 utc_offset_str = chosen_utc if chosen_utc else "UTC+09:00"
                 
-                # GPS 데이터 검증 강화
+                # GPS 실제 알맹이 검증
                 gps_info = readable_exif.get("GPSInfo", {})
                 coords = None
-                
-                # 껍데기만 있는 GPSInfo가 아니라, 실제 위도(2)와 경도(4) 값이 정상적으로 들어있는지 체크
                 if gps_info and 2 in gps_info and 4 in gps_info and gps_info[2] and gps_info[4]:
                     try:
                         def to_degrees(value):
@@ -71,13 +70,12 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
                         lon = to_degrees(gps_info[4])
                         if readable_exif.get("GPSLongitudeRef", "E") == "W": lon = -lon
                         
-                        # 좌표값이 둘 다 0이 아닐 때만 실제 좌표로 인정
                         if lat != 0.0 or lon != 0.0:
                             coords = (lat, lon)
                     except:
-                        coords = None # 파싱 에러 시 수동 타임존 유지를 위해 None 처리
+                        coords = None
                 
-                # [핵심 수정] 실제 유효한 좌표가 매핑되었을 때만 '동적 타임존 변환'을 수행
+                # 신뢰할 수 있는 GPS 좌표가 있을 때만 동적 변환 수행
                 if coords:
                     try:
                         tf = TimezoneFinder()
@@ -90,14 +88,18 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
                             minutes = int((utc_offset.total_seconds() % 3600) / 60)
                             utc_offset_str = f"UTC{'+' if hours >= 0 else ''}{hours:02d}:{abs(minutes):02d}"
                     except:
-                        pass # 실패하더라도 위에서 선언한 수동 타임존(chosen_utc) 유지
+                        pass
                 
-                # 월 이름 3글자 약어(%b)로 최종 포맷팅
+                # 월 이름 3글자 약어(%b) 포맷
                 text_date = dt.strftime(f"%Y-%b-%d %H:%M {utc_offset_str}")
     except:
+        pass
+
+    # [핵심 보완] 위의 파싱 로직이 완전히 실패했을 때만 원본 모듈의 기능을 백업으로 씀
+    if not text_date:
         text_date = pic.get_datetime()
 
-    # 정렬 및 이미지 합성 레이아웃
+    # 정렬 및 합성 레이아웃 계산
     line_spacing = int(size * 0.2)
     total_text_height = size + line_spacing + d_size
     
@@ -123,10 +125,10 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     except Exception:
         pass
 
-    # 기기 모델명 그리기
+    # 기기명 그리기
     draw.text((int(current_x), int(start_y)), text_camera, fill=(0, 0, 0), font=font_obj, anchor="la")
     
-    # 우측 촬영 정보 & 날짜 그리기
+    # 우측 정보 & 최종 결정된 날짜(text_date) 그리기
     info_x = t + w 
     draw.text((int(info_x), int(start_y)), text_info, fill=(50, 50, 50), font=font_reg, anchor="ra")
 
@@ -137,7 +139,7 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     return canvas
 
 
-# --- [메인 실행 영역] ---
+# --- [메인 구동 영역] ---
 
 uploaded_files = st.file_uploader("사진들을 업로드하세요", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
 
@@ -173,7 +175,7 @@ if uploaded_files:
             )
             single_chosen_utc = photo_timezone.split(" ")[0]
 
-            # 프레임 및 메타데이터 합성 실행
+            # 이미지 프레임 합성
             base_canvas = add_border(image, width, height, thickness, padding)
             final_canvas = place_model(
                 base_canvas, picture, width, height, thickness, padding, logo_file, 
@@ -182,7 +184,7 @@ if uploaded_files:
 
             st.image(final_canvas, caption=f"결과물: {uploaded_file.name}", use_container_width=True)
 
-            # 개별 다운로드
+            # 개별 다운로드 버튼
             buf = io.BytesIO()
             final_canvas.save(buf, format="JPEG", quality=95)
             st.download_button(
