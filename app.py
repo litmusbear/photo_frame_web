@@ -34,13 +34,12 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     text_camera = pic.get_camera()
     text_info = f"f/{pic.get_f_number()}  {pic.get_shutter()}  ISO{pic.get_iso()}"
     
-    # 1. 사용자가 UI에서 선택한 타임존을 기본값으로 단단히 고정
+    # 사용자가 UI에서 최종 선택한 타임존을 기본값으로 지정
     utc_offset_str = chosen_utc if chosen_utc else "UTC+09:00"
     text_date = ""
     date_str = ""
     
     try:
-        # EXIF 데이터 추출 시도
         exif_data = pic.image._getexif() if hasattr(pic, 'image') else None
         if not exif_data and current_path:
             with Image.open(current_path) as img_exif:
@@ -51,7 +50,7 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
             readable_exif = {TAGS.get(tag, tag): val for tag, val in exif_data.items()}
             date_str = readable_exif.get("DateTimeOriginal", "")
             
-            # GPS 데이터 알맹이가 '진짜' 존재할 때만 자동 타임존 연산 수행
+            # GPS 데이터 알맹이 검증
             gps_info = readable_exif.get("GPSInfo", {})
             coords = None
             if gps_info and 2 in gps_info and 4 in gps_info and gps_info[2] and gps_info[4]:
@@ -68,6 +67,7 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
                 except:
                     coords = None
             
+            # 유효한 GPS가 있을 때만 동적 연산으로 수동 선택 무시
             if coords:
                 try:
                     from timezonefinder import TimezoneFinder
@@ -87,41 +87,33 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     except:
         pass
 
-    # --- [핵심: null 또는 파싱 실패 시 수동 강제 덮어쓰기 로직] ---
+    # 날짜 조립 및 null 예외 처리 강제 덮어쓰기
     from datetime import datetime
     
     if date_str:
-        # EXIF에서 날짜 문자열은 구했으나 타임존이 null 취급되었던 경우 처리
         try:
             dt = datetime.strptime(date_str, "%Y:%m:%d %H:%M:%S")
             text_date = dt.strftime(f"%Y-%b-%d %H:%M {utc_offset_str}")
         except:
-            date_str = "" # 포맷 파싱 에러 시 하단 fallback으로 이동
+            date_str = ""
 
-    # EXIF 자체가 null이거나 date_str가 비어있는 완전 무결한 빈 데이터 상태일 때
     if not date_str:
         try:
-            # 기존 모듈에서 00시로 떡칠된 문자열이라도 가져온 뒤 날짜 부분만 분리 시도
             orig_date = pic.get_datetime() 
             if orig_date and "UTC" in orig_date:
-                # 기존 출력포맷(예: '2026-May-13 14:00 UTC+00:00')에서 앞쪽 날짜/시간만 자르기
                 base_part = orig_date.split("UTC")[0].strip()
                 text_date = f"{base_part} {utc_offset_str}"
             else:
-                # 파일 자체의 수정 시간을 차선책으로 활용하여 강제 결합
                 file_mtime = os.path.getmtime(current_path)
                 dt = datetime.fromtimestamp(file_mtime)
                 text_date = dt.strftime(f"%Y-%b-%d %H:%M {utc_offset_str}")
         except:
-            # 최후의 수단: 현재 시스템 시간과 수동 타임존 강제 매핑
             dt = datetime.now()
             text_date = dt.strftime(f"%Y-%b-%d %H:%M {utc_offset_str}")
-    # ---------------------------------------------------------------------
 
     # 레이아웃 정렬 및 이미지 합성
     line_spacing = int(size * 0.2)
     total_text_height = size + line_spacing + d_size
-    
     start_y = h + (p - total_text_height) // 2
     visual_center_y = int(start_y + (size * 0.62)) 
     
@@ -147,7 +139,7 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     # 기기 모델명 그리기
     draw.text((int(current_x), int(start_y)), text_camera, fill=(0, 0, 0), font=font_obj, anchor="la")
     
-    # 우측 정보 & 최종 조립된 날짜(text_date) 그리기
+    # 우측 정보 & 날짜 그리기
     info_x = t + w 
     draw.text((int(info_x), int(start_y)), text_info, fill=(50, 50, 50), font=font_reg, anchor="ra")
 
@@ -165,7 +157,14 @@ uploaded_files = st.file_uploader("사진들을 업로드하세요", type=["jpg"
 if uploaded_files:
     temp_file_paths = []
 
+    # 파일 업로드 시 파일명을 기반으로 session_state에 타임존 저장 공간 확보
     for uploaded_file in uploaded_files:
+        file_id = uploaded_file.name
+        if file_id not in st.session_state:
+            st.session_state[file_id] = "UTC+09:00 (한국/일본)"
+
+    for uploaded_file in uploaded_files:
+        file_id = uploaded_file.name
         unique_id = uuid.uuid4().hex
         temp_path = f"temp_{unique_id}.jpg"
         temp_file_paths.append(temp_path)
@@ -184,15 +183,28 @@ if uploaded_files:
             padding = get_padding(height)
             logo_file = logo(picture)
 
-            # 사진 파일 단위 개별 설정창 배치
             st.subheader(f"🖼️ 파일: {uploaded_file.name}")
+            
+            # [핵심 수정] 타임존 선택지 정의
+            tz_options = ["UTC+09:00 (한국/일본)", "UTC+01:00 (유럽 서부)", "UTC+00:00 (런던/GMT)", "UTC-05:00 (뉴욕/동부)"]
+            
+            # session_state에 기억된 인덱스 계산
+            current_index = tz_options.index(st.session_state[file_id])
+
+            # selectbox 조작 시 session_state를 즉시 갱신하도록 콜백 함수 연결
+            def update_tz(fid=file_id, uid=unique_id):
+                st.session_state[fid] = st.session_state[f"selectbox_{uid}"]
+
             photo_timezone = st.selectbox(
                 f"└ GPS 미검출 시 적용할 타임존 설정",
-                ["UTC+09:00 (한국/일본)", "UTC+01:00 (유럽 서부)", "UTC+00:00 (런던/GMT)", "UTC-05:00 (뉴욕/동부)"],
-                index=0,
-                key=f"tz_{unique_id}"
+                tz_options,
+                index=current_index,
+                key=f"selectbox_{unique_id}",
+                on_change=update_tz
             )
-            single_chosen_utc = photo_timezone.split(" ")[0]
+            
+            # 최종 선택된 값에서 문자열 슬라이싱 ("UTC+01:00" 형태 추출)
+            single_chosen_utc = st.session_state[file_id].split(" ")[0]
 
             # 이미지 프레임 합성
             base_canvas = add_border(image, width, height, thickness, padding)
@@ -203,7 +215,7 @@ if uploaded_files:
 
             st.image(final_canvas, caption=f"결과물: {uploaded_file.name}", use_container_width=True)
 
-            # 개별 다운로드 버튼
+            # 다운로드 버튼
             buf = io.BytesIO()
             final_canvas.save(buf, format="JPEG", quality=95)
             st.download_button(
