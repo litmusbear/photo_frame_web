@@ -9,7 +9,7 @@ def logo(picture):
         logo_file = "logos/sony.png"
     elif "CANON" in camera_model:
         logo_file = "logos/canon.png"
-    elif "IPHONE" in camera_model:
+    elif "IPHONE" in camera_model or "IPAD" in camera_model:
         logo_file = "logos/apple.png"
     elif "SAMSUNG" in camera_model or "SM" in camera_model:
         logo_file = "logos/samsung.png"
