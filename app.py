@@ -50,7 +50,8 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
             
             gps_info = readable_exif.get("GPSInfo", {})
             coords = None
-            if gps_info and 2 in gps_info and 4 in gps_info ImageDrawand gps_info[2] and gps_info[4]:
+            # [🛠️ 오타 수정 완료] ImageDraw 문구를 완벽히 제거하고 and로 정상 연결했습니다.
+            if gps_info and 2 in gps_info and 4 in gps_info and gps_info[2] and gps_info[4]:
                 try:
                     def to_degrees(value):
                         return float(value[0]) + (float(value[1]) / 60.0) + (float(value[2]) / 3600.0)
@@ -190,7 +191,6 @@ if uploaded_files:
                 chosen_utc=single_chosen_utc, current_path=temp_path
             )
 
-            # [🛠️ 핵심 수정] 경고 로그의 원인인 use_container_width=True를 width='stretch'로 변경!
             st.image(final_canvas, caption=f"결과물: {uploaded_file.name}", width='stretch')
 
             buf = io.BytesIO()
