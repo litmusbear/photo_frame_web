@@ -34,9 +34,13 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     text_camera = pic.get_camera()
     text_info = f"f/{pic.get_f_number()}  {pic.get_shutter()}  ISO{pic.get_iso()}"
     
-    # 1. 날짜 및 타임존 문자열 직접 생성 시작
+    # 1. 사용자가 UI에서 선택한 타임존을 기본값으로 단단히 고정
+    utc_offset_str = chosen_utc if chosen_utc else "UTC+09:00"
     text_date = ""
+    date_str = ""
+    
     try:
+        # EXIF 데이터 추출 시도
         exif_data = pic.image._getexif() if hasattr(pic, 'image') else None
         if not exif_data and current_path:
             with Image.open(current_path) as img_exif:
@@ -47,59 +51,74 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
             readable_exif = {TAGS.get(tag, tag): val for tag, val in exif_data.items()}
             date_str = readable_exif.get("DateTimeOriginal", "")
             
-            if date_str:
-                from datetime import datetime
-                from timezonefinder import TimezoneFinder
-                import pytz
-                
-                dt = datetime.strptime(date_str, "%Y:%m:%d %H:%M:%S")
-                
-                # 사용자가 UI에서 고른 수동 타임존을 '절대적 기본값'으로 세팅
-                utc_offset_str = chosen_utc if chosen_utc else "UTC+09:00"
-                
-                # GPS 실제 알맹이 검증
-                gps_info = readable_exif.get("GPSInfo", {})
-                coords = None
-                if gps_info and 2 in gps_info and 4 in gps_info and gps_info[2] and gps_info[4]:
-                    try:
-                        def to_degrees(value):
-                            return float(value[0]) + (float(value[1]) / 60.0) + (float(value[2]) / 3600.0)
-                        
-                        lat = to_degrees(gps_info[2])
-                        if readable_exif.get("GPSLatitudeRef", "N") == "S": lat = -lat
-                        lon = to_degrees(gps_info[4])
-                        if readable_exif.get("GPSLongitudeRef", "E") == "W": lon = -lon
-                        
-                        if lat != 0.0 or lon != 0.0:
-                            coords = (lat, lon)
-                    except:
-                        coords = None
-                
-                # 신뢰할 수 있는 GPS 좌표가 있을 때만 동적 변환 수행
-                if coords:
-                    try:
-                        tf = TimezoneFinder()
-                        tz_name = tf.timezone_at(lat=coords[0], lng=coords[1])
-                        if tz_name:
-                            timezone = pytz.timezone(tz_name)
-                            aware_dt = timezone.localize(dt)
-                            utc_offset = aware_dt.utcoffset()
-                            hours = int(utc_offset.total_seconds() / 3600)
-                            minutes = int((utc_offset.total_seconds() % 3600) / 60)
-                            utc_offset_str = f"UTC{'+' if hours >= 0 else ''}{hours:02d}:{abs(minutes):02d}"
-                    except:
-                        pass
-                
-                # 월 이름 3글자 약어(%b) 포맷
-                text_date = dt.strftime(f"%Y-%b-%d %H:%M {utc_offset_str}")
+            # GPS 데이터 알맹이가 '진짜' 존재할 때만 자동 타임존 연산 수행
+            gps_info = readable_exif.get("GPSInfo", {})
+            coords = None
+            if gps_info and 2 in gps_info and 4 in gps_info and gps_info[2] and gps_info[4]:
+                try:
+                    def to_degrees(value):
+                        return float(value[0]) + (float(value[1]) / 60.0) + (float(value[2]) / 3600.0)
+                    lat = to_degrees(gps_info[2])
+                    if readable_exif.get("GPSLatitudeRef", "N") == "S": lat = -lat
+                    lon = to_degrees(gps_info[4])
+                    if readable_exif.get("GPSLongitudeRef", "E") == "W": lon = -lon
+                    
+                    if lat != 0.0 or lon != 0.0:
+                        coords = (lat, lon)
+                except:
+                    coords = None
+            
+            if coords:
+                try:
+                    from timezonefinder import TimezoneFinder
+                    import pytz
+                    tf = TimezoneFinder()
+                    tz_name = tf.timezone_at(lat=coords[0], lng=coords[1])
+                    if tz_name:
+                        timezone = pytz.timezone(tz_name)
+                        dt_obj = datetime.strptime(date_str, "%Y:%m:%d %H:%M:%S")
+                        aware_dt = timezone.localize(dt_obj)
+                        utc_offset = aware_dt.utcoffset()
+                        hours = int(utc_offset.total_seconds() / 3600)
+                        minutes = int((utc_offset.total_seconds() % 3600) / 60)
+                        utc_offset_str = f"UTC{'+' if hours >= 0 else ''}{hours:02d}:{abs(minutes):02d}"
+                except:
+                    pass
     except:
         pass
 
-    # [핵심 보완] 위의 파싱 로직이 완전히 실패했을 때만 원본 모듈의 기능을 백업으로 씀
-    if not text_date:
-        text_date = pic.get_datetime()
+    # --- [핵심: null 또는 파싱 실패 시 수동 강제 덮어쓰기 로직] ---
+    from datetime import datetime
+    
+    if date_str:
+        # EXIF에서 날짜 문자열은 구했으나 타임존이 null 취급되었던 경우 처리
+        try:
+            dt = datetime.strptime(date_str, "%Y:%m:%d %H:%M:%S")
+            text_date = dt.strftime(f"%Y-%b-%d %H:%M {utc_offset_str}")
+        except:
+            date_str = "" # 포맷 파싱 에러 시 하단 fallback으로 이동
 
-    # 정렬 및 합성 레이아웃 계산
+    # EXIF 자체가 null이거나 date_str가 비어있는 완전 무결한 빈 데이터 상태일 때
+    if not date_str:
+        try:
+            # 기존 모듈에서 00시로 떡칠된 문자열이라도 가져온 뒤 날짜 부분만 분리 시도
+            orig_date = pic.get_datetime() 
+            if orig_date and "UTC" in orig_date:
+                # 기존 출력포맷(예: '2026-May-13 14:00 UTC+00:00')에서 앞쪽 날짜/시간만 자르기
+                base_part = orig_date.split("UTC")[0].strip()
+                text_date = f"{base_part} {utc_offset_str}"
+            else:
+                # 파일 자체의 수정 시간을 차선책으로 활용하여 강제 결합
+                file_mtime = os.path.getmtime(current_path)
+                dt = datetime.fromtimestamp(file_mtime)
+                text_date = dt.strftime(f"%Y-%b-%d %H:%M {utc_offset_str}")
+        except:
+            # 최후의 수단: 현재 시스템 시간과 수동 타임존 강제 매핑
+            dt = datetime.now()
+            text_date = dt.strftime(f"%Y-%b-%d %H:%M {utc_offset_str}")
+    # ---------------------------------------------------------------------
+
+    # 레이아웃 정렬 및 이미지 합성
     line_spacing = int(size * 0.2)
     total_text_height = size + line_spacing + d_size
     
@@ -125,10 +144,10 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     except Exception:
         pass
 
-    # 기기명 그리기
+    # 기기 모델명 그리기
     draw.text((int(current_x), int(start_y)), text_camera, fill=(0, 0, 0), font=font_obj, anchor="la")
     
-    # 우측 정보 & 최종 결정된 날짜(text_date) 그리기
+    # 우측 정보 & 최종 조립된 날짜(text_date) 그리기
     info_x = t + w 
     draw.text((int(info_x), int(start_y)), text_info, fill=(50, 50, 50), font=font_reg, anchor="ra")
 
