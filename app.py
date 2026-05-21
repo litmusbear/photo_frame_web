@@ -13,7 +13,7 @@ st.set_page_config(page_title="폴라로이드 프레임 생성기", layout="cen
 st.title("📸 폴라로이드 스타일 사진 프레임 생성기")
 
 
-# --- [함수들을 st.file_uploader 바깥으로 이동시켜 실시간 데이터 연동 해결] ---
+# --- [함수 정의 영역] ---
 
 def add_border(img, w, h, t, p):
     border_width = w + (t * 2)
@@ -34,7 +34,6 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     text_camera = pic.get_camera()
     text_info = f"f/{pic.get_f_number()}  {pic.get_shutter()}  ISO{pic.get_iso()}"
     
-    # 날짜 예외 처리 및 수동 타임존 반영 로직
     text_date = ""
     try:
         exif_data = pic.image._getexif() if hasattr(pic, 'image') else None
@@ -54,25 +53,31 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
                 
                 dt = datetime.strptime(date_str, "%Y:%m:%d %H:%M:%S")
                 
-                # 사용자가 사진별로 선택한 타임존 값을 기본 기틀로 지정
+                # [핵심 수정] 사용자가 선택한 타임존을 우선 기본값으로 완벽하게 고정
                 utc_offset_str = chosen_utc if chosen_utc else "UTC+09:00"
                 
-                # GPS 정보가 있는지 확인
+                # GPS 데이터 검증 강화
                 gps_info = readable_exif.get("GPSInfo", {})
                 coords = None
-                if gps_info and 2 in gps_info and 4 in gps_info:
+                
+                # 껍데기만 있는 GPSInfo가 아니라, 실제 위도(2)와 경도(4) 값이 정상적으로 들어있는지 체크
+                if gps_info and 2 in gps_info and 4 in gps_info and gps_info[2] and gps_info[4]:
                     try:
                         def to_degrees(value):
                             return float(value[0]) + (float(value[1]) / 60.0) + (float(value[2]) / 3600.0)
+                        
                         lat = to_degrees(gps_info[2])
                         if readable_exif.get("GPSLatitudeRef", "N") == "S": lat = -lat
                         lon = to_degrees(gps_info[4])
                         if readable_exif.get("GPSLongitudeRef", "E") == "W": lon = -lon
-                        coords = (lat, lon)
+                        
+                        # 좌표값이 둘 다 0이 아닐 때만 실제 좌표로 인정
+                        if lat != 0.0 or lon != 0.0:
+                            coords = (lat, lon)
                     except:
-                        pass
+                        coords = None # 파싱 에러 시 수동 타임존 유지를 위해 None 처리
                 
-                # GPS가 실제로 존재할 때만 수동 설정을 덮어쓰고 자동 연산
+                # [핵심 수정] 실제 유효한 좌표가 매핑되었을 때만 '동적 타임존 변환'을 수행
                 if coords:
                     try:
                         tf = TimezoneFinder()
@@ -85,14 +90,14 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
                             minutes = int((utc_offset.total_seconds() % 3600) / 60)
                             utc_offset_str = f"UTC{'+' if hours >= 0 else ''}{hours:02d}:{abs(minutes):02d}"
                     except:
-                        pass
+                        pass # 실패하더라도 위에서 선언한 수동 타임존(chosen_utc) 유지
                 
-                # 3글자 약어 형식(%b) 적용
+                # 월 이름 3글자 약어(%b)로 최종 포맷팅
                 text_date = dt.strftime(f"%Y-%b-%d %H:%M {utc_offset_str}")
     except:
         text_date = pic.get_datetime()
 
-    # 정렬 및 합성 시작
+    # 정렬 및 이미지 합성 레이아웃
     line_spacing = int(size * 0.2)
     total_text_height = size + line_spacing + d_size
     
@@ -102,7 +107,7 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     spacing = int(w * 0.01)
     current_x = t
 
-    # [로고 처리]
+    # 로고 그리기
     try:
         if l_file and os.path.exists(l_file):
             logo_img = Image.open(l_file).convert("RGBA")
@@ -118,8 +123,10 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     except Exception:
         pass
 
-    # [텍스트 그리기]
+    # 기기 모델명 그리기
     draw.text((int(current_x), int(start_y)), text_camera, fill=(0, 0, 0), font=font_obj, anchor="la")
+    
+    # 우측 촬영 정보 & 날짜 그리기
     info_x = t + w 
     draw.text((int(info_x), int(start_y)), text_info, fill=(50, 50, 50), font=font_reg, anchor="ra")
 
@@ -130,7 +137,7 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     return canvas
 
 
-# --- [메인 구동 영역] ---
+# --- [메인 실행 영역] ---
 
 uploaded_files = st.file_uploader("사진들을 업로드하세요", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
 
@@ -146,7 +153,6 @@ if uploaded_files:
             f.write(uploaded_file.getbuffer())
 
         try:
-            # 1. 데이터 불러오기
             picture = Picture(temp_path)
             image = picture.get_image()
             if image is None:
@@ -157,7 +163,7 @@ if uploaded_files:
             padding = get_padding(height)
             logo_file = logo(picture)
 
-            # 사진마다 개별 UI 렌더링
+            # 사진 파일 단위 개별 설정창 배치
             st.subheader(f"🖼️ 파일: {uploaded_file.name}")
             photo_timezone = st.selectbox(
                 f"└ GPS 미검출 시 적용할 타임존 설정",
@@ -167,10 +173,8 @@ if uploaded_files:
             )
             single_chosen_utc = photo_timezone.split(" ")[0]
 
-            # 2. 실행 및 출력
+            # 프레임 및 메타데이터 합성 실행
             base_canvas = add_border(image, width, height, thickness, padding)
-            
-            # 외부 변수(single_chosen_utc, temp_path)를 안전하게 매개변수 뒤쪽에 붙여서 연동 성공!
             final_canvas = place_model(
                 base_canvas, picture, width, height, thickness, padding, logo_file, 
                 chosen_utc=single_chosen_utc, current_path=temp_path
@@ -178,6 +182,7 @@ if uploaded_files:
 
             st.image(final_canvas, caption=f"결과물: {uploaded_file.name}", use_container_width=True)
 
+            # 개별 다운로드
             buf = io.BytesIO()
             final_canvas.save(buf, format="JPEG", quality=95)
             st.download_button(
