@@ -4,6 +4,7 @@ import uuid
 import os
 import io
 
+# 기존 모듈 임포트 (파일들이 동일 경로에 있어야 합니다)
 from get_data import Picture
 from font import *
 from logo import logo
@@ -36,6 +37,16 @@ if uploaded_files:
             padding = get_padding(height)
             logo_file = logo(picture)
 
+            # [추가] 사진 파일별 수동 타임존 선택 UI (key 중복 방지를 위해 unique_id 활용)
+            st.subheader(f"🖼️ 파일: {uploaded_file.name}")
+            photo_timezone = st.selectbox(
+                f"└ GPS가 없을 경우 적용할 타임존 설정",
+                ["UTC+09:00 (한국/일본)", "UTC+01:00 (유럽 서부)", "UTC+00:00 (런던/GMT)", "UTC-05:00 (뉴욕/동부)"],
+                index=0,
+                key=f"tz_{unique_id}"
+            )
+            single_chosen_utc = photo_timezone.split(" ")[0]
+
             def add_border(img, w, h, t, p):
                 border_width = w + (t * 2)
                 border_height = h + t + p
@@ -43,10 +54,11 @@ if uploaded_files:
                 canvas.paste(img, (t, t))
                 return canvas
 
+            # [수정] 수동 선택된 fallback_utc 인자 추가
             def place_model(canvas, pic, w, h, t, p, l_file, fallback_utc):
-                font_obj = set_font(p)
-                font_reg = regular(p)
-                font_dat = date_font(p)
+                font_obj = set_font(p)       # Bold (모델명)
+                font_reg = regular(p)        # Regular (촬영정보)
+                font_dat = date_font(p)      # Light (날짜)
                 size, d_size = font_size(p)
                 
                 draw = ImageDraw.Draw(canvas)
@@ -54,6 +66,7 @@ if uploaded_files:
                 text_camera = pic.get_camera() 
                 text_info = f"f/{pic.get_f_number()}  {pic.get_shutter()}  ISO{pic.get_iso()}"
                 
+                # --- [수정 핵심: GPS 유무에 따른 날짜 및 타임존 처리] ---
                 date_str = pic.get_exif_data().get("DateTimeOriginal", "")
                 text_date = ""
                 
@@ -63,10 +76,14 @@ if uploaded_files:
                     import pytz
                     
                     dt = datetime.strptime(date_str, "%Y:%m:%d %H:%M:%S")
+                    
+                    # Picture 객체 내부의 get_gps_info 혹은 기존 작성하셨던 방식으로 위경도 확인 시도
                     coords = pic.get_gps_info() if hasattr(pic, 'get_gps_info') else None
                     
+                    # 1단계 기본값: 사용자가 UI에서 수동 선택한 타임존 설정
                     utc_offset_str = fallback_utc 
 
+                    # 2단계 검증: 만약 사진에 진짜 GPS 데이터가 존재한다면 동적 계산하여 덮어쓰기
                     if coords:
                         try:
                             tf = TimezoneFinder()
@@ -79,18 +96,20 @@ if uploaded_files:
                                 minutes = int((utc_offset.total_seconds() % 3600) / 60)
                                 utc_offset_str = f"UTC{'+' if hours >= 0 else ''}{hours:02d}:{abs(minutes):02d}"
                         except:
-                            pass
+                            pass # GPS 분석 실패 시 1단계에서 설정된 수동 세팅값 유지
                     
+                    # 월 이름 약어 포맷 적용 (%B -> %b)
                     text_date = dt.strftime(f"%Y-%b-%d %H:%M {utc_offset_str}")
+                # -------------------------------------------------------------
 
                 line_spacing = int(size * 0.2)
                 total_text_height = size + line_spacing + d_size
                 start_y = h + (p - total_text_height) // 2
-                visual_center_y = int(start_y + (size * 0.55)) 
+                
+                visual_center_y = int(start_y + (size * 0.62)) 
                 
                 spacing = int(w * 0.01)
-                current_x = t 
-
+                current_x = t
                 try:
                     if l_file and os.path.exists(l_file):
                         logo_img = Image.open(l_file).convert("RGBA")
@@ -105,10 +124,10 @@ if uploaded_files:
                         current_x = logo_x + logo_w + int(spacing * 0.7)
                 except:
                     pass
-
                 draw.text((int(current_x), int(start_y)), text_camera, fill=(0, 0, 0), font=font_obj, anchor="la")
 
                 info_x = t + w 
+                
                 draw.text((int(info_x), int(start_y)), text_info, fill=(50, 50, 50), font=font_reg, anchor="ra")
 
                 if text_date:
@@ -117,35 +136,6 @@ if uploaded_files:
 
                 return canvas
 
-            st.subheader(f"🖼️ 파일: {uploaded_file.name}")
-            
-            photo_timezone = st.selectbox(
-                f"└ 이 사진의 GPS 미검출 시 기본 타임존 설정",
-                ["UTC+09:00 (한국/일본)", "UTC+01:00 (유럽 서부)", "UTC+00:00 (런던/GMT)", "UTC-05:00 (뉴욕/동부)"],
-                index=0,
-                key=f"tz_{unique_id}"
-            )
-            single_chosen_utc = photo_timezone.split(" ")[0]
-
+            # 이미지 합성 프로세스 실행 (수동 선택한 single_chosen_utc 인자 추가 전달)
             base_canvas = add_border(image, width, height, thickness, padding)
-            final_canvas = place_model(base_canvas, picture, width, height, thickness, padding, logo_file, single_chosen_utc)
-
-            st.image(final_canvas, caption=f"결과물 미리보기: {uploaded_file.name}", use_container_width=True)
-
-            buf = io.BytesIO()
-            final_canvas.save(buf, format="JPEG", quality=95)
-            st.download_button(
-                label=f"💾 {uploaded_file.name} 다운로드",
-                data=buf.getvalue(),
-                file_name=f"polaroid_{uploaded_file.name}",
-                key=f"btn_{unique_id}"
-            )
-            
-        except Exception as e:
-            st.error(f"⚠️ '{uploaded_file.name}' 처리 중 오류 발생: {e}")
-            
-        st.divider()
-
-    for path in temp_file_paths:
-        if os.path.exists(path):
-            os.remove(path)
+            final_canvas = place_model(base_canvas, picture, width, height,
