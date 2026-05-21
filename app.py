@@ -13,6 +13,13 @@ from border import *
 st.set_page_config(page_title="폴라로이드 프레임 생성기", layout="centered")
 st.title("📸 폴라로이드 스타일 사진 프레임 생성기")
 
+default_timezone = st.selectbox(
+    "GPS가 없는 사진의 기본 타임존을 선택하세요",
+    ["UTC+09:00 (한국/일본)", "UTC+01:00 (유럽 서부)", "UTC+00:00 (런던/GMT)", "UTC-05:00 (뉴욕/동부)"],
+    index=0
+)
+chosen_utc = default_timezone.split(" ")[0] 
+
 uploaded_files = st.file_uploader("사진들을 업로드하세요", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
 
 if uploaded_files:
