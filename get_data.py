@@ -87,7 +87,7 @@ class Picture():
         self.image = self.image = ImageOps.exif_transpose(img)
         self.camera = self.exif.get("Model", "Unknown Camera")
         self.iso = self.exif.get("ISOSpeedRatings", "?")
-        self.f_number = round(self.exif.get("FNumber", "?"))
+        self.f_number = float(round(self.exif.get("FNumber", "?"),1))
         self.shutter = get_shutter(self.exif)
         self.datetime = get_datetime(self.exif)
 
