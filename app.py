@@ -4,7 +4,6 @@ import uuid
 import os
 import io
 
-# 기존 모듈 임포트 (파일들이 동일 경로에 있어야 합니다)
 from get_data import Picture
 from font import *
 from logo import logo
@@ -12,13 +11,6 @@ from border import *
 
 st.set_page_config(page_title="폴라로이드 프레임 생성기", layout="centered")
 st.title("📸 폴라로이드 스타일 사진 프레임 생성기")
-
-default_timezone = st.selectbox(
-    "GPS가 없는 사진의 기본 타임존을 선택하세요",
-    ["UTC+09:00 (한국/일본)", "UTC+01:00 (유럽 서부)", "UTC+00:00 (런던/GMT)", "UTC-05:00 (뉴욕/동부)"],
-    index=0
-)
-chosen_utc = default_timezone.split(" ")[0] 
 
 uploaded_files = st.file_uploader("사진들을 업로드하세요", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
 
@@ -51,26 +43,54 @@ if uploaded_files:
                 canvas.paste(img, (t, t))
                 return canvas
 
-            def place_model(canvas, pic, w, h, t, p, l_file):
-                font_obj = set_font(p)       # Bold (모델명)
-                font_reg = regular(p)        # Regular (촬영정보)
-                font_dat = date_font(p)      # Light (날짜)
+            def place_model(canvas, pic, w, h, t, p, l_file, fallback_utc):
+                font_obj = set_font(p)
+                font_reg = regular(p)
+                font_dat = date_font(p)
                 size, d_size = font_size(p)
                 
                 draw = ImageDraw.Draw(canvas)
                 
                 text_camera = pic.get_camera() 
                 text_info = f"f/{pic.get_f_number()}  {pic.get_shutter()}  ISO{pic.get_iso()}"
-                text_date = pic.get_datetime()
+                
+                date_str = pic.get_exif_data().get("DateTimeOriginal", "")
+                text_date = ""
+                
+                if date_str:
+                    from datetime import datetime
+                    from timezonefinder import TimezoneFinder
+                    import pytz
+                    
+                    dt = datetime.strptime(date_str, "%Y:%m:%d %H:%M:%S")
+                    coords = pic.get_gps_info() if hasattr(pic, 'get_gps_info') else None
+                    
+                    utc_offset_str = fallback_utc 
+
+                    if coords:
+                        try:
+                            tf = TimezoneFinder()
+                            tz_name = tf.timezone_at(lat=coords[0], lng=coords[1])
+                            if tz_name:
+                                timezone = pytz.timezone(tz_name)
+                                aware_dt = timezone.localize(dt)
+                                utc_offset = aware_dt.utcoffset()
+                                hours = int(utc_offset.total_seconds() / 3600)
+                                minutes = int((utc_offset.total_seconds() % 3600) / 60)
+                                utc_offset_str = f"UTC{'+' if hours >= 0 else ''}{hours:02d}:{abs(minutes):02d}"
+                        except:
+                            pass
+                    
+                    text_date = dt.strftime(f"%Y-%b-%d %H:%M {utc_offset_str}")
 
                 line_spacing = int(size * 0.2)
                 total_text_height = size + line_spacing + d_size
                 start_y = h + (p - total_text_height) // 2
-                
-                visual_center_y = int(start_y + (size * 0.62)) 
+                visual_center_y = int(start_y + (size * 0.55)) 
                 
                 spacing = int(w * 0.01)
-                current_x = t
+                current_x = t 
+
                 try:
                     if l_file and os.path.exists(l_file):
                         logo_img = Image.open(l_file).convert("RGBA")
@@ -85,10 +105,10 @@ if uploaded_files:
                         current_x = logo_x + logo_w + int(spacing * 0.7)
                 except:
                     pass
+
                 draw.text((int(current_x), int(start_y)), text_camera, fill=(0, 0, 0), font=font_obj, anchor="la")
 
                 info_x = t + w 
-                
                 draw.text((int(info_x), int(start_y)), text_info, fill=(50, 50, 50), font=font_reg, anchor="ra")
 
                 if text_date:
@@ -97,18 +117,28 @@ if uploaded_files:
 
                 return canvas
 
-            base_canvas = add_border(image, width, height, thickness, padding)
-            final_canvas = place_model(base_canvas, picture, width, height, thickness, padding, logo_file)
+            st.subheader(f"🖼️ 파일: {uploaded_file.name}")
+            
+            photo_timezone = st.selectbox(
+                f"└ 이 사진의 GPS 미검출 시 기본 타임존 설정",
+                ["UTC+09:00 (한국/일본)", "UTC+01:00 (유럽 서부)", "UTC+00:00 (런던/GMT)", "UTC-05:00 (뉴욕/동부)"],
+                index=0,
+                key=f"tz_{unique_id}"
+            )
+            single_chosen_utc = photo_timezone.split(" ")[0]
 
-            st.image(final_canvas, caption=f"완성된 이미지: {uploaded_file.name}", use_container_width=True)
+            base_canvas = add_border(image, width, height, thickness, padding)
+            final_canvas = place_model(base_canvas, picture, width, height, thickness, padding, logo_file, single_chosen_utc)
+
+            st.image(final_canvas, caption=f"결과물 미리보기: {uploaded_file.name}", use_container_width=True)
 
             buf = io.BytesIO()
             final_canvas.save(buf, format="JPEG", quality=95)
             st.download_button(
-                label=f"💾 {uploaded_file.name} 저장하기",
+                label=f"💾 {uploaded_file.name} 다운로드",
                 data=buf.getvalue(),
                 file_name=f"polaroid_{uploaded_file.name}",
-                key=unique_id
+                key=f"btn_{unique_id}"
             )
             
         except Exception as e:
