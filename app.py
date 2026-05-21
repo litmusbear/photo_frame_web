@@ -121,31 +121,24 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
             current_x = logo_x + logo_w + int(spacing * 0.7)
     except: pass
 
-    # --- [🛠️ 굵기 보존형 실시간 스케일링 로직] ---
     info_x = t + w
     info_width = draw.textlength(text_info, font=font_reg)
     max_available_x = info_x - info_width - (spacing * 2)
     max_text_width = max_available_x - current_x
     current_text_width = draw.textlength(text_camera, font=font_obj)
     
-    # 억지 굵기(스트로크) 기본값
     camera_stroke_width = 0
     
     if current_text_width > max_text_width:
         scale_factor = max(max_text_width / current_text_width, 0.4)
         new_size = int(size * scale_factor)
         
-        # [처방 1] 기존 font_obj가 가지고 있던 볼드체 폰트 파일 경로를 정확히 유지하면서 크기만 분양
-        font_path = font_obj.path if hasattr(font_obj, 'path') else "fonts/CustomFont.ttf" 
-        try:
-            font_obj = ImageFont.truetype(font_path, new_size)
-        except:
-            pass
+        # [🛠️ 원인 해결] font.py에 만든 함수를 호출하여 index=1(볼드체) 서브셋을 완벽하게 유지한 채 재생성!
+        font_obj = create_custom_font(new_size, is_bold=True)
         
-        # [처방 2] 글자가 많이 작아졌을 경우(비율 85% 이하) 텍스트 외곽선 두께를 주어 강제로 볼드하게 만듦
-        if scale_factor < 0.85:
-            camera_stroke_width = max(1, int(new_size * 0.04))  # 폰트 크기에 비례하여 굵기 제어
-    # --------------------------------------------
+        # 크기가 심각하게 작아졌을 때만 픽셀 손실 보정용 미세 스트로크 작동
+        if scale_factor < 0.8:
+            camera_stroke_width = max(1, int(new_size * 0.03))
 
     # 최종 글자 그리기 (stroke 속성 추가)
     draw.text(
