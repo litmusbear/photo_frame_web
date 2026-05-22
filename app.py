@@ -210,7 +210,7 @@ if uploaded_files:
             padding = get_padding(height)
             logo_file = logo(picture)
 
-                        st.subheader(f"🖼️ 파일: {uploaded_files.name if hasattr(uploaded_files, 'name') else uploaded_file.name}")
+            st.subheader(f"🖼️ 파일: {uploaded_files.name if hasattr(uploaded_files, 'name') else uploaded_file.name}")
             
             # --- [🛠️ GPS 검출 여부 미리 파악하기] ---
             show_timezone_selector = True # 기본적으로는 셀렉트박스를 보여줌
