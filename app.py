@@ -265,9 +265,6 @@ if uploaded_files:
                     key=f"selectbox_{unique_id}",
                     on_change=make_callback()
                 )
-            else:
-                # GPS가 검출되었다면 유저에게 안내 메시지만 깔끔하게 보여줍니다.
-                st.success("✅ 사진에서 GPS 데이터가 검출되어 자동으로 타임존을 맞췄습니다!")
             
             # 캔버스 생성 및 모델 배치 (기존 로직 유지)
             single_chosen_utc = st.session_state.tz_dict[file_id].split(" ")[0]
