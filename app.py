@@ -268,6 +268,14 @@ def main(page: ft.Page):
         )
     )
 
+#if __name__ == "__main__":
+#    port = int(os.getenv("PORT", 8502))
+# 기존 코드:
+# ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=port, host="0.0.0.0")
+
+# 👇 이렇게 수정해서 덮어쓰기 하세요!
 if __name__ == "__main__":
+    import os
     port = int(os.getenv("PORT", 8502))
-    ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=port, host="0.0.0.0")
+    # 💡 현재 폴더('.') 자체를 assets 폴더로 지정하여 logos와 fonts를 모두 강제 인식시킵니다.
+    ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=port, host="0.0.0.0", assets_dir=".")
