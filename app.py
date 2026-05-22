@@ -10,8 +10,34 @@ from font import *
 from logo import logo
 from border import *
 
+# 1. 페이지 설정 및 감성 테마 CSS 적용
 st.set_page_config(page_title="폴라로이드 프레임 생성기", layout="centered")
+
+st.markdown("""
+    <style>
+    /* 따뜻하고 감성적인 스튜디오 톤 배경 */
+    .stApp {
+        background-color: #FBF9F6;
+    }
+    /* 업로드 박스 디자인 고급화 */
+    .stFileUploader {
+        background-color: #ffffff;
+        padding: 25px;
+        border-radius: 16px;
+        box-shadow: 0px 8px 24px rgba(149, 157, 165, 0.06);
+        border: 1px dashed #E2DFD9;
+    }
+    /* 안내 문구 스타일 */
+    .info-text {
+        color: #6E6E6E;
+        font-size: 0.95rem;
+        margin-bottom: 20px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
 st.title("📸 폴라로이드 스타일 사진 프레임 생성기")
+st.markdown('<p class="info-text">디지털 사진에 카메라 기종, 촬영 정보(EXIF), 그리고 감성적인 폴라로이드 테두리를 입혀줍니다.</p>', unsafe_allow_html=True)
 
 
 def add_border(img, w, h, t, p):
@@ -23,7 +49,7 @@ def add_border(img, w, h, t, p):
 
 
 def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=None):
-    font_obj = set_font(p)  # 이게 본래 볼드체 폰트 객체일 것입니다.
+    font_obj = set_font(p)  
     font_reg = regular(p)
     font_dat = date_font(p)
     size, d_size = font_size(p)
@@ -33,7 +59,6 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     text_camera = pic.get_camera()
     text_info = f"f/{pic.get_f_number()}  {pic.get_shutter()}  ISO{pic.get_iso()}"
     
-    # 1. 타임존 및 날짜 영역 (기존 유지)
     utc_offset_str = chosen_utc if chosen_utc else "UTC+09:00"
     text_date = ""
     date_str = ""
@@ -98,7 +123,6 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
             except:
                 text_date = datetime.now().strftime(f"%Y-%b-%d %H:%M {chosen_utc}")
 
-    # 레이아웃 좌표 계산
     line_spacing = int(size * 0.2)
     start_y = h + (p - (size + line_spacing + d_size)) // 2
     visual_center_y = int(start_y + (size * 0.62)) 
@@ -106,7 +130,6 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     spacing = int(w * 0.01)
     current_x = t
 
-    # 로고 계산
     try:
         if l_file and os.path.exists(l_file):
             logo_img = Image.open(l_file).convert("RGBA")
@@ -132,23 +155,18 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     if current_text_width > max_text_width:
         scale_factor = max(max_text_width / current_text_width, 0.4)
         new_size = int(size * scale_factor)
-        
-        # [🛠️ 원인 해결] font.py에 만든 함수를 호출하여 index=1(볼드체) 서브셋을 완벽하게 유지한 채 재생성!
         font_obj = create_custom_font(new_size, is_bold=True)
-        
-        # 크기가 심각하게 작아졌을 때만 픽셀 손실 보정용 미세 스트로크 작동
         if scale_factor < 0.8:
             camera_stroke_width = max(1, int(new_size * 0.03))
 
-    # 최종 글자 그리기 (stroke 속성 추가)
     draw.text(
         (int(current_x), int(start_y)), 
         text_camera, 
         fill=(0, 0, 0), 
         font=font_obj, 
         anchor="la",
-        stroke_width=camera_stroke_width,  # 👈 작아지면 작동하는 페이크 볼드 두께
-        stroke_fill=(0, 0, 0)              # 👈 외곽선 색상도 검은색으로 통일
+        stroke_width=camera_stroke_width,  
+        stroke_fill=(0, 0, 0)              
     )
     
     draw.text((int(info_x), int(start_y)), text_info, fill=(50, 50, 50), font=font_reg, anchor="ra")
@@ -159,6 +177,8 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
 
     return canvas
 
+
+# 파일 업로더 컴포넌트
 uploaded_files = st.file_uploader("사진들을 업로드하세요", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
 
 if uploaded_files:
@@ -170,7 +190,6 @@ if uploaded_files:
     for uploaded_file in uploaded_files:
         file_id = uploaded_file.name
         if file_id not in st.session_state.tz_dict:
-            # 기본값도 리스트 내의 매칭되는 문자열로 변경
             st.session_state.tz_dict[file_id] = "UTC+09:00 (한국/일본/인도네시아 동부)"
 
         unique_id = uuid.uuid4().hex
@@ -193,7 +212,6 @@ if uploaded_files:
 
             st.subheader(f"🖼️ 파일: {uploaded_file.name}")
             
-            # --- [🛠️ 다른 변경 없이 시간대 데이터만 대폭 확장] ---
             tz_options = [
                 "UTC+09:00 (한국/일본/인도네시아 동부)",
                 "UTC+08:00 (중국/대만/홍콩/싱가포르/필리핀)",
@@ -216,7 +234,6 @@ if uploaded_files:
             def make_callback(fid=file_id, uid=unique_id):
                 return lambda: st.session_state.tz_dict.update({fid: st.session_state[f"selectbox_{uid}"]})
 
-            # 확장된 리스트에 기존 세션 값이 없을 때를 대비한 안전 장치
             if st.session_state.tz_dict[file_id] in tz_options:
                 current_index = tz_options.index(st.session_state.tz_dict[file_id])
             else:
@@ -238,15 +255,17 @@ if uploaded_files:
                 chosen_utc=single_chosen_utc, current_path=temp_path
             )
 
-            st.image(final_canvas, caption=f"결과물: {uploaded_file.name}", width='stretch')
+            # stretch 옵션을 유연하게 제어하기 위해 use_container_width 사용 권장
+            st.image(final_canvas, caption=f"결과물: {uploaded_file.name}", use_container_width=True)
 
             buf = io.BytesIO()
             final_canvas.save(buf, format="JPEG", quality=95)
             st.download_button(
-                label=f"{uploaded_file.name} 저장",
+                label=f"📥 {uploaded_file.name} 저장",
                 data=buf.getvalue(),
                 file_name=f"result_{uploaded_file.name}",
-                key=f"btn_{unique_id}"
+                key=f"btn_{unique_id}",
+                use_container_width=True # 버튼을 가득 채워 시원하게 보이도록 변경
             )
             
         except Exception as e:
@@ -261,3 +280,6 @@ if uploaded_files:
                 os.remove(path)
             except:
                 pass
+else:
+    # 2. 사진을 아직 업로드하지 않았을 때 보여줄 감성적인 대기 화면 안내 (Placeholder)
+    st.info("💡 위 박스에 사진을 업로드하면 촬영 정보가 담긴 폴라로이드 프레임이 실시간으로 생성됩니다.")
