@@ -210,8 +210,25 @@ if uploaded_files:
             padding = get_padding(height)
             logo_file = logo(picture)
 
-            st.subheader(f"🖼️ 파일: {uploaded_file.name}")
+                        st.subheader(f"🖼️ 파일: {uploaded_files.name if hasattr(uploaded_files, 'name') else uploaded_file.name}")
             
+            # --- [🛠️ GPS 검출 여부 미리 파악하기] ---
+            show_timezone_selector = True # 기본적으로는 셀렉트박스를 보여줌
+            
+            try:
+                with Image.open(temp_path) as img_exif:
+                    exif_data = img_exif._getexif()
+                if exif_data:
+                    from PIL.ExifTags import TAGS
+                    readable_exif = {TAGS.get(tag, tag): val for tag, val in exif_data.items()}
+                    gps_info = readable_exif.get("GPSInfo", {})
+                    # GPS 위도(2)와 경도(4) 데이터가 올바르게 존재하는지 확인
+                    if gps_info and 2 in gps_info and 4 in gps_info:
+                        show_timezone_selector = False # GPS가 있으므로 셀렉트박스를 숨김!
+            except:
+                pass # 에러 발생 시에는 안전하게 셀렉트박스를 보여줌
+
+            # 타임존 선택지 정의
             tz_options = [
                 "UTC+09:00 (한국/일본/인도네시아 동부)",
                 "UTC+08:00 (중국/대만/홍콩/싱가포르/필리핀)",
@@ -231,22 +248,28 @@ if uploaded_files:
                 "UTC+12:00 (뉴질랜드/피지)"
             ]
             
-            def make_callback(fid=file_id, uid=unique_id):
-                return lambda: st.session_state.tz_dict.update({fid: st.session_state[f"selectbox_{uid}"]})
+            # --- [🛠️ 조건부 UI 랜더링] ---
+            if show_timezone_selector:
+                def make_callback(fid=file_id, uid=unique_id):
+                    return lambda: st.session_state.tz_dict.update({fid: st.session_state[f"selectbox_{uid}"]})
 
-            if st.session_state.tz_dict[file_id] in tz_options:
-                current_index = tz_options.index(st.session_state.tz_dict[file_id])
+                if st.session_state.tz_dict[file_id] in tz_options:
+                    current_index = tz_options.index(st.session_state.tz_dict[file_id])
+                else:
+                    current_index = 0
+
+                photo_timezone = st.selectbox(
+                    f"⚠️ GPS 정보가 없습니다. 적용할 타임존을 선택하세요.",
+                    tz_options,
+                    index=current_index,
+                    key=f"selectbox_{unique_id}",
+                    on_change=make_callback()
+                )
             else:
-                current_index = 0
-
-            photo_timezone = st.selectbox(
-                f"└ GPS 미검출 시 적용할 타임존 설정",
-                tz_options,
-                index=current_index,
-                key=f"selectbox_{unique_id}",
-                on_change=make_callback()
-            )
+                # GPS가 검출되었다면 유저에게 안내 메시지만 깔끔하게 보여줍니다.
+                st.success("✅ 사진에서 GPS 데이터가 검출되어 자동으로 타임존을 맞췄습니다!")
             
+            # 캔버스 생성 및 모델 배치 (기존 로직 유지)
             single_chosen_utc = st.session_state.tz_dict[file_id].split(" ")[0]
 
             base_canvas = add_border(image, width, height, thickness, padding)
