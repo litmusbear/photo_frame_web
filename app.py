@@ -1,19 +1,17 @@
-import streamlit as st
-from PIL import Image, ImageDraw, ImageFont
-import uuid
+import flet as ft
 import os
+import uuid
 import io
 from datetime import datetime
+from PIL import Image, ImageDraw
 
+# 기존에 만드신 소중한 모듈들 그대로 가져와서 씁니다!
 from get_data import Picture
 from font import *
 from logo import logo
 from border import *
 
-st.set_page_config(page_title="폴라로이드 프레임 생성기", layout="centered")
-st.title("📸 폴라로이드 스타일 사진 프레임 생성기")
-
-
+# 1. 기존 스트림릿에 있던 액자 테두리 추가 함수 (그대로 유지)
 def add_border(img, w, h, t, p):
     border_width = w + (t * 2)
     border_height = h + t + p
@@ -21,19 +19,17 @@ def add_border(img, w, h, t, p):
     canvas.paste(img, (t, t))
     return canvas
 
-
+# 2. 기존 글자 배치 함수 (스트림릿 종속성 제거 후 그대로 유지)
 def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=None):
-    font_obj = set_font(p)  # 이게 본래 볼드체 폰트 객체일 것입니다.
+    font_obj = set_font(p)  
     font_reg = regular(p)
     font_dat = date_font(p)
     size, d_size = font_size(p)
     
     draw = ImageDraw.Draw(canvas)
-    
     text_camera = pic.get_camera()
     text_info = f"f/{pic.get_f_number()}  {pic.get_shutter()}  ISO{pic.get_iso()}"
     
-    # 1. 타임존 및 날짜 영역 (기존 유지)
     utc_offset_str = chosen_utc if chosen_utc else "UTC+09:00"
     text_date = ""
     date_str = ""
@@ -56,8 +52,7 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
                     if readable_exif.get("GPSLatitudeRef", "N") == "S": lat = -lat
                     lon = to_degrees(gps_info[4])
                     if readable_exif.get("GPSLongitudeRef", "E") == "W": lon = -lon
-                    if abs(lat) > 0.001 and abs(lon) > 0.001:
-                        coords = (lat, lon)
+                    if abs(lat) > 0.001 and abs(lon) > 0.001: coords = (lat, lon)
                 except: coords = None
 
             if coords:
@@ -98,27 +93,20 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
             except:
                 text_date = datetime.now().strftime(f"%Y-%b-%d %H:%M {chosen_utc}")
 
-    # 레이아웃 좌표 계산
     line_spacing = int(size * 0.2)
     start_y = h + (p - (size + line_spacing + d_size)) // 2
     visual_center_y = int(start_y + (size * 0.62)) 
-    
     spacing = int(w * 0.01)
     current_x = t
 
-    # 로고 계산
     try:
         if l_file and os.path.exists(l_file):
             logo_img = Image.open(l_file).convert("RGBA")
             logo_h = int(size * 0.95) 
             logo_w = int(logo_img.width * (logo_h / logo_img.height))
             logo_img = logo_img.resize((logo_w, logo_h), Image.Resampling.LANCZOS)
-            
-            logo_x = int(current_x)
-            logo_y = int(visual_center_y - (logo_h // 2))
-            canvas.paste(logo_img, (logo_x, logo_y), logo_img)
-            
-            current_x = logo_x + logo_w + int(spacing * 0.7)
+            canvas.paste(logo_img, (int(current_x), int(visual_center_y - (logo_h // 2))), logo_img)
+            current_x = current_x + logo_w + int(spacing * 0.7)
     except: pass
 
     info_x = t + w
@@ -126,31 +114,16 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     max_available_x = info_x - info_width - (spacing * 2)
     max_text_width = max_available_x - current_x
     current_text_width = draw.textlength(text_camera, font=font_obj)
-    
     camera_stroke_width = 0
     
     if current_text_width > max_text_width:
         scale_factor = max(max_text_width / current_text_width, 0.4)
         new_size = int(size * scale_factor)
-        
-        # [🛠️ 원인 해결] font.py에 만든 함수를 호출하여 index=1(볼드체) 서브셋을 완벽하게 유지한 채 재생성!
         font_obj = create_custom_font(new_size, is_bold=True)
-        
-        # 크기가 심각하게 작아졌을 때만 픽셀 손실 보정용 미세 스트로크 작동
         if scale_factor < 0.8:
             camera_stroke_width = max(1, int(new_size * 0.03))
 
-    # 최종 글자 그리기 (stroke 속성 추가)
-    draw.text(
-        (int(current_x), int(start_y)), 
-        text_camera, 
-        fill=(0, 0, 0), 
-        font=font_obj, 
-        anchor="la",
-        stroke_width=camera_stroke_width,  # 👈 작아지면 작동하는 페이크 볼드 두께
-        stroke_fill=(0, 0, 0)              # 👈 외곽선 색상도 검은색으로 통일
-    )
-    
+    draw.text((int(current_x), int(start_y)), text_camera, fill=(0, 0, 0), font=font_obj, anchor="la", stroke_width=camera_stroke_width, stroke_fill=(0, 0, 0))
     draw.text((int(info_x), int(start_y)), text_info, fill=(50, 50, 50), font=font_reg, anchor="ra")
 
     if text_date:
@@ -159,105 +132,156 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
 
     return canvas
 
-uploaded_files = st.file_uploader("사진들을 업로드하세요", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
 
-if uploaded_files:
-    temp_file_paths = []
+# 3. 🔥 여기서부터 본래 스트림릿 UI 영역을 Flet 스마트 UI로 완전히 갈아치운 핵심입니다!
+def main(page: ft.Page):
+    page.title = "📸 폴라로이드 스타일 프레임 생성기"
+    page.window_width = 650
+    page.window_height = 800
+    page.scroll = ft.ScrollMode.AUTO
+    page.theme_mode = ft.ThemeMode.LIGHT
 
-    if "tz_dict" not in st.session_state:
-        st.session_state.tz_dict = {}
+    # 확장 시간대 라인업 목록
+    tz_options = [
+        "UTC+09:00 (한국/일본/인도네시아 동부)", "UTC+08:00 (중국/대만/홍콩/싱가포르/필리핀)",
+        "UTC+07:00 (베트남/태국/인도네시아 서부)", "UTC+05:30 (인도/스리랑카)",
+        "UTC+04:00 (두바이/아랍에미리트/오만)", "UTC+03:00 (사우디/터키/동유럽/모스크바)",
+        "UTC+02:00 (그리스/이집트/남아공/중유럽 서머타임)", "UTC+01:00 (프랑스/독일/이탈리아/스페인/서유럽)",
+        "UTC+00:00 (런던/영국/아일랜드/GMT 표준시)", "UTC-04:00 (미국 동부 서머타임/캐나다)",
+        "UTC-05:00 (뉴욕/워싱턴/미국 동부 표준시)", "UTC-06:00 (시카고/미국 중부 표준시)",
+        "UTC-08:00 (로스앤젤레스/샌프란시스코/미국 태평양 표준시)", "UTC-10:00 (하와이)",
+        "UTC+10:00 (시드니/멜버른/호주 동부)", "UTC+12:00 (뉴질랜드/피지)"
+    ]
 
-    for uploaded_file in uploaded_files:
-        file_id = uploaded_file.name
-        if file_id not in st.session_state.tz_dict:
-            # 기본값도 리스트 내의 매칭되는 문자열로 변경
-            st.session_state.tz_dict[file_id] = "UTC+09:00 (한국/일본/인도네시아 동부)"
+    selected_files_paths = []
+    processed_image_bytes = None
+    output_filename = "result_image.jpg"
 
-        unique_id = uuid.uuid4().hex
-        temp_path = f"temp_{unique_id}.jpg"
-        temp_file_paths.append(temp_path)
+    # UI 컴포넌트 선언
+    status_text = ft.Text("작업할 사진을 하단에서 선택해 주세요.", size=14, color=ft.colors.GREY_700)
+    image_preview = ft.Image(visible=False, border_radius=10, fit=ft.ImageFit.CONTAIN, max_height=450)
+    
+    tz_dropdown = ft.Dropdown(
+        label="GPS 미검출 시 적용할 타임존 설정",
+        options=[ft.dropdown.Option(tz) for tz in tz_options],
+        value=tz_options[0],
+        width=450,
+        visible=False
+    )
 
-        with open(temp_path, "wb") as f:
-            f.write(uploaded_file.getbuffer())
+    # 저장 버튼 누르면 로컬에 바로 저장하는 시스템 팝업 띄우기
+    def save_file_result(e: ft.FilePickerResultEvent):
+        if e.path and processed_image_bytes:
+            with open(e.path, "wb") as f:
+                f.write(processed_image_bytes)
+            status_text.value = f"🎉 성공적으로 저장되었습니다: {os.path.basename(e.path)}"
+            page.update()
 
+    save_file_picker = ft.FilePicker(on_result=save_file_result)
+    page.overlay.append(save_file_picker)
+
+    download_btn = ft.ElevatedButton(
+        text="프레임 합성 사진 저장하기",
+        icon=ft.icons.SAVE,
+        color=ft.colors.WHITE,
+        bgcolor=ft.colors.BLUE_700,
+        visible=False,
+        on_click=lambda _: save_file_picker.save_file(file_name=output_filename, allowed_extensions=["jpg"])
+    )
+
+    # 톱니바퀴 연산 핵심부
+    def process_image():
+        nonlocal processed_image_bytes, output_filename
+        if not selected_files_paths:
+            return
+        
+        img_path = selected_files_paths[0]
+        output_filename = f"result_{os.path.basename(img_path)}"
+        
         try:
-            picture = Picture(temp_path)
+            picture = Picture(img_path)
             image = picture.get_image()
             if image is None:
-                raise ValueError("이미지를 읽을 수 없습니다.")
+                status_text.value = "❌ 이미지를 읽을 수 없습니다."
+                page.update()
+                return
 
             width, height = image.size
             thickness = get_thickness(height)
             padding = get_padding(height)
+            
+            # 순정 소니 사진 강제 구제 3줄 로직 포함
             logo_file = logo(picture)
+            if not logo_file:
+                exif_str = str(image._getexif()).upper()
+                if "SONY" in exif_str or "ILCE" in exif_str or "ZV-" in exif_str:
+                    logo_file = "logos/sony.png"
 
-            st.subheader(f"🖼️ 파일: {uploaded_file.name}")
-            
-            # --- [🛠️ 다른 변경 없이 시간대 데이터만 대폭 확장] ---
-            tz_options = [
-                "UTC+09:00 (한국/일본/인도네시아 동부)",
-                "UTC+08:00 (중국/대만/홍콩/싱가포르/필리핀)",
-                "UTC+07:00 (베트남/태국/인도네시아 서부)",
-                "UTC+05:30 (인도/스리랑카)",
-                "UTC+04:00 (두바이/아랍에미리트/오만)",
-                "UTC+03:00 (사우디/터키/동유럽/모스크바)",
-                "UTC+02:00 (그리스/이집트/남아공/중유럽 서머타임)",
-                "UTC+01:00 (프랑스/독일/이탈리아/스페인/서유럽)",
-                "UTC+00:00 (런던/영국/아일랜드/GMT 표준시)",
-                "UTC-04:00 (미국 동부 서머타임/캐나다)",
-                "UTC-05:00 (뉴욕/워싱턴/미국 동부 표준시)",
-                "UTC-06:00 (시카고/미국 중부 표준시)",
-                "UTC-08:00 (로스앤젤레스/샌프란시스코/미국 태평양 표준시)",
-                "UTC-10:00 (하와이)",
-                "UTC+10:00 (시드니/멜버른/호주 동부)",
-                "UTC+12:00 (뉴질랜드/피지)"
-            ]
-            
-            def make_callback(fid=file_id, uid=unique_id):
-                return lambda: st.session_state.tz_dict.update({fid: st.session_state[f"selectbox_{uid}"]})
-
-            # 확장된 리스트에 기존 세션 값이 없을 때를 대비한 안전 장치
-            if st.session_state.tz_dict[file_id] in tz_options:
-                current_index = tz_options.index(st.session_state.tz_dict[file_id])
-            else:
-                current_index = 0
-
-            photo_timezone = st.selectbox(
-                f"└ GPS 미검출 시 적용할 타임존 설정",
-                tz_options,
-                index=current_index,
-                key=f"selectbox_{unique_id}",
-                on_change=make_callback()
-            )
-            
-            single_chosen_utc = st.session_state.tz_dict[file_id].split(" ")[0]
+            single_chosen_utc = tz_dropdown.value.split(" ")[0]
 
             base_canvas = add_border(image, width, height, thickness, padding)
             final_canvas = place_model(
                 base_canvas, picture, width, height, thickness, padding, logo_file, 
-                chosen_utc=single_chosen_utc, current_path=temp_path
+                chosen_utc=single_chosen_utc, current_path=img_path
             )
 
-            st.image(final_canvas, caption=f"결과물: {uploaded_file.name}", width='stretch')
-
+            # Flet 화면 표기용 바이트 변환
             buf = io.BytesIO()
             final_canvas.save(buf, format="JPEG", quality=95)
-            st.download_button(
-                label=f"{uploaded_file.name} 저장",
-                data=buf.getvalue(),
-                file_name=f"result_{uploaded_file.name}",
-                key=f"btn_{unique_id}"
-            )
-            
-        except Exception as e:
-            st.error(f"⚠️ '{uploaded_file.name}' 처리 중 오류 발생: {e}")
-            continue
-            
-        st.divider()
+            processed_image_bytes = buf.getvalue()
 
-    for path in temp_file_paths:
-        if os.path.exists(path):
-            try:
-                os.remove(path)
-            except:
-                pass
+            image_preview.src_bytes = processed_image_bytes
+            image_preview.visible = True
+            download_btn.visible = True
+            status_text.value = f"✅ 처리 완료! ({os.path.basename(img_path)})"
+        except Exception as ex:
+            status_text.value = f"⚠️ 오류 발생: {ex}"
+        
+        page.update()
+
+    # 타임존 바꾸면 사진 전체 리런(Rerun) 없이 데이터만 즉시 재계산!
+    tz_dropdown.on_change = lambda _: process_image()
+
+    # 파일 가져오기 창 띄우기 및 콜백
+    def pick_files_result(e: ft.FilePickerResultEvent):
+        if e.files:
+            selected_files_paths.clear()
+            selected_files_paths.append(e.files[0].path)
+            tz_dropdown.visible = True
+            process_image()
+
+    file_picker = ft.FilePicker(on_result=pick_files_result)
+    page.overlay.append(file_picker)
+
+    upload_btn = ft.FilledButton(
+        text="사진 가져오기 (컴퓨터에서 선택)",
+        icon=ft.icons.PHOTO_LIBRARY,
+        on_click=lambda _: file_picker.pick_files(allow_multiple=False, file_type=ft.FilePickerFileType.IMAGE)
+    )
+
+    # 앱 UI 레이아웃 선언
+    page.add(
+        ft.Container(
+            content=ft.Column(
+                [
+                    ft.Text("📸 데스크톱 폴라로이드 프레임 툴", size=24, weight=ft.FontWeight.BOLD),
+                    status_text,
+                    ft.Divider(),
+                    image_preview,
+                    tz_dropdown,
+                    ft.Row([upload_btn, download_btn], alignment=ft.MainAxisAlignment.CENTER, spacing=15),
+                ],
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=20
+            ),
+            padding=20,
+            alignment=ft.alignment.center
+        )
+    )
+
+# 데스크톱 네이티브 앱 창으로 실행!
+if __name__ == "__main__":
+    import os
+    # 서버 환경(Render)에서 부여하는 포트 번호를 자동으로 잡고, 웹뷰로 실행하게 만듭니다.
+    port = int(os.getenv("PORT", 8502))
+    ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=port)
