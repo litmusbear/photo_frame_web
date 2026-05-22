@@ -135,7 +135,7 @@ def main(page: ft.Page):
     page.scroll = ft.ScrollMode.AUTO
     page.theme_mode = ft.ThemeMode.LIGHT
 
-    # 최신 Flet 웹 최적화 설정 적용 (에러 원인 소거)
+    # 웹 환경 크기 설정
     page.window_width = 650
     page.window_height = 800
 
@@ -154,11 +154,10 @@ def main(page: ft.Page):
     processed_image_bytes = None
     output_filename = "result_image.jpg"
 
-    # Flet 신버전 규격에 맞춰 문자열 컬러 명시로 수정 (로그 에러 해결 코드)
     status_text = ft.Text("작업할 사진을 하단에서 선택해 주세요.", size=14, color="grey")
     
-    # max_height 속성을 완벽히 도려내고 컨테이너 구조로 변경 (핵심 에러 해결 코드)
-    image_preview = ft.Image(visible=False, border_radius=10)
+    # 🛠️ 핵심 조치: 최신 버전 에러('src' 누락)를 극복하기 위해 빈 문자열 임시 할당
+    image_preview = ft.Image(src="", visible=False, border_radius=10)
     image_container = ft.Container(content=image_preview, height=450, alignment=ft.alignment.center)
     
     tz_dropdown = ft.Dropdown(
@@ -275,5 +274,4 @@ def main(page: ft.Page):
 if __name__ == "__main__":
     import os
     port = int(os.getenv("PORT", 8502))
-    # assets_dir을 현재 경로로 명시해 깨짐 현상을 원천 방지합니다.
     ft.app(target=main, port=port, host="0.0.0.0", assets_dir=".")
