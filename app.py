@@ -5,13 +5,12 @@ import io
 from datetime import datetime
 from PIL import Image, ImageDraw
 
-# 기존에 만드신 소중한 모듈들 그대로 가져와서 씁니다!
+# 기존에 만드신 모듈들
 from get_data import Picture
 from font import *
 from logo import logo
 from border import *
 
-# 1. 기존 스트림릿에 있던 액자 테두리 추가 함수 (그대로 유지)
 def add_border(img, w, h, t, p):
     border_width = w + (t * 2)
     border_height = h + t + p
@@ -19,7 +18,6 @@ def add_border(img, w, h, t, p):
     canvas.paste(img, (t, t))
     return canvas
 
-# 2. 기존 글자 배치 함수 (스트림릿 종속성 제거 후 그대로 유지)
 def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=None):
     font_obj = set_font(p)  
     font_reg = regular(p)
@@ -133,7 +131,6 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     return canvas
 
 
-# 3. 🔥 여기서부터 본래 스트림릿 UI 영역을 Flet 스마트 UI로 완전히 갈아치운 핵심입니다!
 def main(page: ft.Page):
     page.title = "📸 폴라로이드 스타일 프레임 생성기"
     page.window_width = 650
@@ -141,7 +138,6 @@ def main(page: ft.Page):
     page.scroll = ft.ScrollMode.AUTO
     page.theme_mode = ft.ThemeMode.LIGHT
 
-    # 확장 시간대 라인업 목록
     tz_options = [
         "UTC+09:00 (한국/일본/인도네시아 동부)", "UTC+08:00 (중국/대만/홍콩/싱가포르/필리핀)",
         "UTC+07:00 (베트남/태국/인도네시아 서부)", "UTC+05:30 (인도/스리랑카)",
@@ -157,8 +153,8 @@ def main(page: ft.Page):
     processed_image_bytes = None
     output_filename = "result_image.jpg"
 
-    # UI 컴포넌트 선언
-    status_text = ft.Text("작업할 사진을 하단에서 선택해 주세요.", size=14, color=ft.colors.GREY_700)
+    # 💡 [버그 해결] ft.colors 대신 안전하게 일반 문자열("grey700", "white", "blue700")로 색상을 대체했습니다.
+    status_text = ft.Text("작업할 사진을 하단에서 선택해 주세요.", size=14, color="grey700")
     image_preview = ft.Image(visible=False, border_radius=10, fit=ft.ImageFit.CONTAIN, max_height=450)
     
     tz_dropdown = ft.Dropdown(
@@ -169,7 +165,6 @@ def main(page: ft.Page):
         visible=False
     )
 
-    # 저장 버튼 누르면 로컬에 바로 저장하는 시스템 팝업 띄우기
     def save_file_result(e: ft.FilePickerResultEvent):
         if e.path and processed_image_bytes:
             with open(e.path, "wb") as f:
@@ -183,13 +178,12 @@ def main(page: ft.Page):
     download_btn = ft.ElevatedButton(
         text="프레임 합성 사진 저장하기",
         icon=ft.icons.SAVE,
-        color=ft.colors.WHITE,
-        bgcolor=ft.colors.BLUE_700,
+        color="white",
+        bgcolor="blue700",
         visible=False,
         on_click=lambda _: save_file_picker.save_file(file_name=output_filename, allowed_extensions=["jpg"])
     )
 
-    # 톱니바퀴 연산 핵심부
     def process_image():
         nonlocal processed_image_bytes, output_filename
         if not selected_files_paths:
@@ -210,7 +204,6 @@ def main(page: ft.Page):
             thickness = get_thickness(height)
             padding = get_padding(height)
             
-            # 순정 소니 사진 강제 구제 3줄 로직 포함
             logo_file = logo(picture)
             if not logo_file:
                 exif_str = str(image._getexif()).upper()
@@ -225,7 +218,6 @@ def main(page: ft.Page):
                 chosen_utc=single_chosen_utc, current_path=img_path
             )
 
-            # Flet 화면 표기용 바이트 변환
             buf = io.BytesIO()
             final_canvas.save(buf, format="JPEG", quality=95)
             processed_image_bytes = buf.getvalue()
@@ -239,10 +231,8 @@ def main(page: ft.Page):
         
         page.update()
 
-    # 타임존 바꾸면 사진 전체 리런(Rerun) 없이 데이터만 즉시 재계산!
     tz_dropdown.on_change = lambda _: process_image()
 
-    # 파일 가져오기 창 띄우기 및 콜백
     def pick_files_result(e: ft.FilePickerResultEvent):
         if e.files:
             selected_files_paths.clear()
@@ -259,7 +249,6 @@ def main(page: ft.Page):
         on_click=lambda _: file_picker.pick_files(allow_multiple=False, file_type=ft.FilePickerFileType.IMAGE)
     )
 
-    # 앱 UI 레이아웃 선언
     page.add(
         ft.Container(
             content=ft.Column(
@@ -279,9 +268,6 @@ def main(page: ft.Page):
         )
     )
 
-# 데스크톱 네이티브 앱 창으로 실행!
 if __name__ == "__main__":
-    import os
-    # 서버 환경(Render)에서 부여하는 포트 번호를 자동으로 잡고, 웹뷰로 실행하게 만듭니다.
     port = int(os.getenv("PORT", 8502))
-    ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=port)
+    ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=port, host="0.0.0.0")
