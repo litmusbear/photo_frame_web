@@ -170,7 +170,8 @@ if uploaded_files:
     for uploaded_file in uploaded_files:
         file_id = uploaded_file.name
         if file_id not in st.session_state.tz_dict:
-            st.session_state.tz_dict[file_id] = "UTC+09:00 (한국/일본)"
+            # 기본값도 리스트 내의 매칭되는 문자열로 변경
+            st.session_state.tz_dict[file_id] = "UTC+09:00 (한국/일본/인도네시아 동부)"
 
         unique_id = uuid.uuid4().hex
         temp_path = f"temp_{unique_id}.jpg"
@@ -192,12 +193,34 @@ if uploaded_files:
 
             st.subheader(f"🖼️ 파일: {uploaded_file.name}")
             
-            tz_options = ["UTC+09:00 (한국/일본)", "UTC+01:00 (유럽 서부)", "UTC+00:00 (런던/GMT)", "UTC-05:00 (뉴욕/동부)"]
+            # --- [🛠️ 다른 변경 없이 시간대 데이터만 대폭 확장] ---
+            tz_options = [
+                "UTC+09:00 (한국/일본/인도네시아 동부)",
+                "UTC+08:00 (중국/대만/홍콩/싱가포르/필리핀)",
+                "UTC+07:00 (베트남/태국/인도네시아 서부)",
+                "UTC+05:30 (인도/스리랑카)",
+                "UTC+04:00 (두바이/아랍에미리트/오만)",
+                "UTC+03:00 (사우디/터키/동유럽/모스크바)",
+                "UTC+02:00 (그리스/이집트/남아공/중유럽 서머타임)",
+                "UTC+01:00 (프랑스/독일/이탈리아/스페인/서유럽)",
+                "UTC+00:00 (런던/영국/아일랜드/GMT 표준시)",
+                "UTC-04:00 (미국 동부 서머타임/캐나다)",
+                "UTC-05:00 (뉴욕/워싱턴/미국 동부 표준시)",
+                "UTC-06:00 (시카고/미국 중부 표준시)",
+                "UTC-08:00 (로스앤젤레스/샌프란시스코/미국 태평양 표준시)",
+                "UTC-10:00 (하와이)",
+                "UTC+10:00 (시드니/멜버른/호주 동부)",
+                "UTC+12:00 (뉴질랜드/피지)"
+            ]
             
             def make_callback(fid=file_id, uid=unique_id):
                 return lambda: st.session_state.tz_dict.update({fid: st.session_state[f"selectbox_{uid}"]})
 
-            current_index = tz_options.index(st.session_state.tz_dict[file_id])
+            # 확장된 리스트에 기존 세션 값이 없을 때를 대비한 안전 장치
+            if st.session_state.tz_dict[file_id] in tz_options:
+                current_index = tz_options.index(st.session_state.tz_dict[file_id])
+            else:
+                current_index = 0
 
             photo_timezone = st.selectbox(
                 f"└ GPS 미검출 시 적용할 타임존 설정",
