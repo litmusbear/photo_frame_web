@@ -133,16 +133,17 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
 
 def main(page: ft.Page):
     page.title = "📸 폴라로이드 스타일 프레임 생성기"
-    page.window_width = 650
-    page.window_height = 800
     page.scroll = ft.ScrollMode.AUTO
     page.theme_mode = ft.ThemeMode.LIGHT
+
+    # 최신 윈도우 크기 지정 방식 적용
+    page.window = ft.Window(width=650, height=800)
 
     tz_options = [
         "UTC+09:00 (한국/일본/인도네시아 동부)", "UTC+08:00 (중국/대만/홍콩/싱가포르/필리핀)",
         "UTC+07:00 (베트남/태국/인도네시아 서부)", "UTC+05:30 (인도/스리랑카)",
         "UTC+04:00 (두바이/아랍에미리트/오만)", "UTC+03:00 (사우디/터키/동유럽/모스크바)",
-        "UTC+02:00 (그리스/이집트/남아공/중유럽 서머타임)", "UTC+01:00 (프랑스/독일/이탈리아/스페인/서유럽)",
+        "UTC+02:00 (그ريس/이집트/남아공/중유럽 서머타임)", "UTC+01:00 (프랑스/독일/이탈리아/스페인/서유럽)",
         "UTC+00:00 (런던/영국/아일랜드/GMT 표준시)", "UTC-04:00 (미국 동부 서머타임/캐나다)",
         "UTC-05:00 (뉴욕/워싱턴/미국 동부 표준시)", "UTC-06:00 (시카고/미국 중부 표준시)",
         "UTC-08:00 (로스앤젤레스/샌프란시스코/미국 태평양 표준시)", "UTC-10:00 (하와이)",
@@ -153,9 +154,12 @@ def main(page: ft.Page):
     processed_image_bytes = None
     output_filename = "result_image.jpg"
 
-    # 💡 들여쓰기를 완벽하게 맞추어 main 함수 내부 영역으로 정상 정렬했습니다.
-    status_text = ft.Text("작업할 사진을 하단에서 선택해 주세요.", size=14, color="grey700")
-    image_preview = ft.Image(visible=False, border_radius=10, fit=ft.BoxFit.CONTAIN, max_height=450)
+    # 🛠️ ft.colors 관련 에러 방지를 위해 텍스트 색상을 문자열로 직접 지정합니다.
+    status_text = ft.Text("작업할 사진을 하단에서 선택해 주세요.", size=14, color="grey")
+    
+    # 🛠️ 신버전/구버전 하이브리드 에러 방지: 크기 속성을 완전 분리하여 Container로 감싸 제어합니다.
+    image_preview = ft.Image(visible=False, border_radius=10)
+    image_container = ft.Container(content=image_preview, height=450, alignment=ft.alignment.center)
     
     tz_dropdown = ft.Dropdown(
         label="GPS 미검출 시 적용할 타임존 설정",
@@ -179,7 +183,7 @@ def main(page: ft.Page):
         text="프레임 합성 사진 저장하기",
         icon=ft.icons.SAVE,
         color="white",
-        bgcolor="blue700",
+        bgcolor="blue",
         visible=False,
         on_click=lambda _: save_file_picker.save_file(file_name=output_filename, allowed_extensions=["jpg"])
     )
@@ -256,7 +260,7 @@ def main(page: ft.Page):
                     ft.Text("📸 데스크톱 폴라로이드 프레임 툴", size=24, weight=ft.FontWeight.BOLD),
                     status_text,
                     ft.Divider(),
-                    image_preview,
+                    image_container,
                     tz_dropdown,
                     ft.Row([upload_btn, download_btn], alignment=ft.MainAxisAlignment.CENTER, spacing=15),
                 ],
@@ -271,11 +275,5 @@ def main(page: ft.Page):
 if __name__ == "__main__":
     import os
     port = int(os.getenv("PORT", 8502))
-    # ❌ 기존 코드 (현재 상태):
-# ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=port, host="0.0.0.0", assets_dir=".")
-
-# 👇 이렇게 "assets"로 폴더 이름을 명확하게 지정해 줍니다!
-if __name__ == "__main__":
-    import os
-    port = int(os.getenv("PORT", 8502))
-    ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=port, host="0.0.0.0", assets_dir="assets")
+    # 💡 폴더 탐색 범위를 에셋 루트(".")로 잡아 모든 리소스를 안정적으로 부릅니다.
+    ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=port, host="0.0.0.0", assets_dir=".")
