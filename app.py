@@ -155,7 +155,9 @@ def main(page: ft.Page):
 
     # 💡 [버그 해결] ft.colors 대신 안전하게 일반 문자열("grey700", "white", "blue700")로 색상을 대체했습니다.
     status_text = ft.Text("작업할 사진을 하단에서 선택해 주세요.", size=14, color="grey700")
-    image_preview = ft.Image(visible=False, border_radius=10, fit=ft.ImageFit.CONTAIN, max_height=450)
+
+# 👇 아래처럼 'ft.BoxFit.CONTAIN'으로 딱 수정해 줍니다!
+image_preview = ft.Image(visible=False, border_radius=10, fit=ft.BoxFit.CONTAIN, max_height=450)
     
     tz_dropdown = ft.Dropdown(
         label="GPS 미검출 시 적용할 타임존 설정",
