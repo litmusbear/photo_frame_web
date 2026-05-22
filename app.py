@@ -271,4 +271,11 @@ def main(page: ft.Page):
 if __name__ == "__main__":
     import os
     port = int(os.getenv("PORT", 8502))
-    ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=port, host="0.0.0.0", assets_dir=".")
+    # ❌ 기존 코드 (현재 상태):
+# ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=port, host="0.0.0.0", assets_dir=".")
+
+# 👇 이렇게 "assets"로 폴더 이름을 명확하게 지정해 줍니다!
+if __name__ == "__main__":
+    import os
+    port = int(os.getenv("PORT", 8502))
+    ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=port, host="0.0.0.0", assets_dir="assets")
