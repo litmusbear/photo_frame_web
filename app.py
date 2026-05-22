@@ -153,11 +153,9 @@ def main(page: ft.Page):
     processed_image_bytes = None
     output_filename = "result_image.jpg"
 
-    # 💡 [버그 해결] ft.colors 대신 안전하게 일반 문자열("grey700", "white", "blue700")로 색상을 대체했습니다.
+    # 💡 들여쓰기를 완벽하게 맞추어 main 함수 내부 영역으로 정상 정렬했습니다.
     status_text = ft.Text("작업할 사진을 하단에서 선택해 주세요.", size=14, color="grey700")
-
-# 👇 아래처럼 'ft.BoxFit.CONTAIN'으로 딱 수정해 줍니다!
-image_preview = ft.Image(visible=False, border_radius=10, fit=ft.BoxFit.CONTAIN, max_height=450)
+    image_preview = ft.Image(visible=False, border_radius=10, fit=ft.BoxFit.CONTAIN, max_height=450)
     
     tz_dropdown = ft.Dropdown(
         label="GPS 미검출 시 적용할 타임존 설정",
@@ -270,14 +268,7 @@ image_preview = ft.Image(visible=False, border_radius=10, fit=ft.BoxFit.CONTAIN,
         )
     )
 
-#if __name__ == "__main__":
-#    port = int(os.getenv("PORT", 8502))
-# 기존 코드:
-# ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=port, host="0.0.0.0")
-
-# 👇 이렇게 수정해서 덮어쓰기 하세요!
 if __name__ == "__main__":
     import os
     port = int(os.getenv("PORT", 8502))
-    # 💡 현재 폴더('.') 자체를 assets 폴더로 지정하여 logos와 fonts를 모두 강제 인식시킵니다.
     ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=port, host="0.0.0.0", assets_dir=".")
