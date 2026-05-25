@@ -55,7 +55,7 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     font_dat = date_font(p)
     size, d_size = font_size(p)
     
-    # 💡 [글자 크기 미세 조정] 가로형 사진일 때 너무 커지지 않도록 배율을 1.15배로 대폭 낮췄습니다.
+    # 가로형 사진(w > h)일 때 적당한 폰트 스케일 고정 (1.15배)
     if w > h:
         scale_up_factor = 1.15  
         size = int(size * scale_up_factor)
@@ -132,10 +132,10 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
 
     line_spacing = int(size * 0.2)
     
-    # 💡 [사진과 글자 사이 간격 유지]
-    # 글자 크기는 작아졌지만 간격(gap)을 p(하단 여백)의 22%만큼 줘서 확실히 떨어뜨립니다.
+    # 💡 [간격 2/3 축소 반영 구역] 
+    # 기존 p * 0.22 배수에서 p * 0.15 배수로 낮추어, 이전 간격의 딱 2/3 크기로 조율했습니다.
     if w > h:
-        gap = int(p * 0.22)  
+        gap = int(p * 0.15)  
         start_y = h + t + gap
     else:
         start_y = h + (p - (size + line_spacing + d_size)) // 2  
@@ -174,7 +174,6 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
         if scale_factor < 0.8:
             camera_stroke_width = max(1, int(new_size * 0.03))
     elif w > h:
-        # 가로형일 때 줄어든 size 밸런스에 맞춰 다시 생성
         font_obj = create_custom_font(size, is_bold=True)
         font_reg = create_custom_font(int(size * 0.85), is_bold=False)
         font_dat = create_custom_font(int(size * 0.65), is_bold=False)
@@ -229,8 +228,8 @@ if uploaded_files:
             
             if width > height:
                 thickness = get_thickness(width)
-                # 💡 하단 흰색 여백(padding)은 충분히 확보하되, 텍스트만 위쪽으로 적당히 떨어트립니다.
-                padding = int(get_padding(width) * 0.95)  
+                # 💡 간격이 좁아진 만큼 흰색 하단 마진판 두께도 0.91배로 슬림하게 깎아 맞췄습니다.
+                padding = int(get_padding(width) * 0.91)  
             else:
                 thickness = get_thickness(height)
                 padding = get_padding(height)
