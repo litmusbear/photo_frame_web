@@ -49,10 +49,20 @@ def add_border(img, w, h, t, p):
 
 
 def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=None):
+    # 기본 외부 폰트 설정 가져오기
     font_obj = set_font(p)  
     font_reg = regular(p)
     font_dat = date_font(p)
     size, d_size = font_size(p)
+    
+    # 💡 [핵심 보정] 가로형 사진(w > h)일 경우, 하단 여백 내에서 글자가 찌그러지지 않도록 폰트 크기 강제 폰트 스케일 업
+    if w > h:
+        scale_up_factor = 1.35  # 가로형일 때 폰트 크기를 약 35% 키움
+        size = int(size * scale_up_factor)
+        d_size = int(d_size * scale_up_factor)
+        
+        # 외부 font 모듈에서 생성한 폰트가 폰트 크기를 동적으로 바꿀 수 없으므로 PIL 내장 객체나 크기 재생성 필요
+        # 단, 외부 라이브러리 호환성을 위해 아래 코드에서 textlength 기반 자동 리사이징 메커니즘이 작동하도록 유도합니다.
     
     draw = ImageDraw.Draw(canvas)
     
@@ -152,12 +162,18 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     
     camera_stroke_width = 0
     
+    # 가로형/세로형 상관없이 텍스트 박스 한계치 스케일링 재조정 구역
     if current_text_width > max_text_width:
         scale_factor = max(max_text_width / current_text_width, 0.4)
         new_size = int(size * scale_factor)
         font_obj = create_custom_font(new_size, is_bold=True)
         if scale_factor < 0.8:
             camera_stroke_width = max(1, int(new_size * 0.03))
+    elif w > h:
+        # 💡 가로형 사진이고 자리가 여유롭다면, 카메라 정보 폰트 사이즈를 보정된 큰 사이즈로 재생성해 덮어씌움
+        font_obj = create_custom_font(size, is_bold=True)
+        font_reg = create_custom_font(int(size * 0.85), is_bold=False)
+        font_dat = create_custom_font(int(size * 0.65), is_bold=False)
 
     draw.text(
         (int(current_x), int(start_y)), 
@@ -206,14 +222,22 @@ if uploaded_files:
                 raise ValueError("이미지를 읽을 수 없습니다.")
 
             width, height = image.size
-            thickness = get_thickness(height)
-            padding = get_padding(height)
+            
+            # 💡 [여백 보정 구역] 가로형 사진일 때 패딩(p)과 두께(t)가 너무 작아지지 않도록 인자 스왑 연산 추가
+            if width > height:
+                # 가로가 더 길면 높이 대신 '가로' 길이를 스케일의 기준으로 세워 여백 확보
+                thickness = get_thickness(width)
+                padding = int(get_padding(width) * 0.85)  # 너무 넓어지지 않게 0.85 보정 계수 적용
+            else:
+                thickness = get_thickness(height)
+                padding = get_padding(height)
+                
             logo_file = logo(picture)
 
             st.subheader(f"🖼️ 파일: {uploaded_files.name if hasattr(uploaded_files, 'name') else uploaded_file.name}")
             
             # --- [🛠️ GPS 검출 여부 미리 파악하기] ---
-            show_timezone_selector = True # 기본적으로는 셀렉트박스를 보여줌
+            show_timezone_selector = True 
             
             try:
                 with Image.open(temp_path) as img_exif:
@@ -222,13 +246,11 @@ if uploaded_files:
                     from PIL.ExifTags import TAGS
                     readable_exif = {TAGS.get(tag, tag): val for tag, val in exif_data.items()}
                     gps_info = readable_exif.get("GPSInfo", {})
-                    # GPS 위도(2)와 경도(4) 데이터가 올바르게 존재하는지 확인
                     if gps_info and 2 in gps_info and 4 in gps_info:
-                        show_timezone_selector = False # GPS가 있으므로 셀렉트박스를 숨김!
+                        show_timezone_selector = False 
             except:
-                pass # 에러 발생 시에는 안전하게 셀렉트박스를 보여줌
+                pass 
 
-            # 타임존 선택지 정의
             tz_options = [
                 "UTC+09:00 (한국/일본/인도네시아 동부)",
                 "UTC+08:00 (중국/대만/홍콩/싱가포르/필리핀)",
@@ -248,7 +270,6 @@ if uploaded_files:
                 "UTC+12:00 (뉴질랜드/피지)"
             ]
             
-            # --- [🛠️ 조건부 UI 랜더링] ---
             if show_timezone_selector:
                 def make_callback(fid=file_id, uid=unique_id):
                     return lambda: st.session_state.tz_dict.update({fid: st.session_state[f"selectbox_{uid}"]})
@@ -266,7 +287,6 @@ if uploaded_files:
                     on_change=make_callback()
                 )
             
-            # 캔버스 생성 및 모델 배치 (기존 로직 유지)
             single_chosen_utc = st.session_state.tz_dict[file_id].split(" ")[0]
 
             base_canvas = add_border(image, width, height, thickness, padding)
@@ -275,7 +295,6 @@ if uploaded_files:
                 chosen_utc=single_chosen_utc, current_path=temp_path
             )
 
-            # stretch 옵션을 유연하게 제어하기 위해 use_container_width 사용 권장
             st.image(final_canvas, caption=f"결과물: {uploaded_file.name}", use_container_width=True)
 
             buf = io.BytesIO()
@@ -285,7 +304,7 @@ if uploaded_files:
                 data=buf.getvalue(),
                 file_name=f"result_{uploaded_file.name}",
                 key=f"btn_{unique_id}",
-                use_container_width=True # 버튼을 가득 채워 시원하게 보이도록 변경
+                use_container_width=True 
             )
             
         except Exception as e:
@@ -301,5 +320,4 @@ if uploaded_files:
             except:
                 pass
 else:
-    # 2. 사진을 아직 업로드하지 않았을 때 보여줄 감성적인 대기 화면 안내 (Placeholder)
     st.info("💡 위 박스에 사진을 업로드하면 촬영 정보가 담긴 폴라로이드 프레임이 실시간으로 생성됩니다.")
