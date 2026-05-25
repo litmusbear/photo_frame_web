@@ -55,14 +55,11 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     font_dat = date_font(p)
     size, d_size = font_size(p)
     
-    # 💡 [핵심 보정] 가로형 사진(w > h)일 경우, 하단 여백 내에서 글자가 찌그러지지 않도록 폰트 크기 강제 폰트 스케일 업
+    # 💡 가로형 사진(w > h)일 경우, 하단 여백 내에서 글자가 찌그러지지 않도록 폰트 크기 강제 폰트 스케일 업
     if w > h:
-        scale_up_factor = 1.35  # 가로형일 때 폰트 크기를 약 35% 키움
+        scale_up_factor = 1.35  
         size = int(size * scale_up_factor)
         d_size = int(d_size * scale_up_factor)
-        
-        # 외부 font 모듈에서 생성한 폰트가 폰트 크기를 동적으로 바꿀 수 없으므로 PIL 내장 객체나 크기 재생성 필요
-        # 단, 외부 라이브러리 호환성을 위해 아래 코드에서 textlength 기반 자동 리사이징 메커니즘이 작동하도록 유도합니다.
     
     draw = ImageDraw.Draw(canvas)
     
@@ -134,7 +131,15 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
                 text_date = datetime.now().strftime(f"%Y-%b-%d %H:%M {chosen_utc}")
 
     line_spacing = int(size * 0.2)
-    start_y = h + (p - (size + line_spacing + d_size)) // 2
+    
+    # 💡 [여백 추가 핵심 타깃]
+    # 가로형 사진일 때, 사진 바로 밑에 붙지 않도록 의도적으로 시작 높이(start_y)를 밀어내 간격을 만듭니다.
+    if w > h:
+        gap = int(size * 0.7)  # 가로형 사진일 때 사진과 글자 사이 마진 폭 (숫자를 키우면 더 멀어집니다)
+        start_y = h + t + gap
+    else:
+        start_y = h + (p - (size + line_spacing + d_size)) // 2  # 세로형 사진은 기존 정중앙 밸런스 유지
+        
     visual_center_y = int(start_y + (size * 0.62)) 
     
     spacing = int(w * 0.01)
@@ -162,7 +167,6 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     
     camera_stroke_width = 0
     
-    # 가로형/세로형 상관없이 텍스트 박스 한계치 스케일링 재조정 구역
     if current_text_width > max_text_width:
         scale_factor = max(max_text_width / current_text_width, 0.4)
         new_size = int(size * scale_factor)
@@ -170,7 +174,6 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
         if scale_factor < 0.8:
             camera_stroke_width = max(1, int(new_size * 0.03))
     elif w > h:
-        # 💡 가로형 사진이고 자리가 여유롭다면, 카메라 정보 폰트 사이즈를 보정된 큰 사이즈로 재생성해 덮어씌움
         font_obj = create_custom_font(size, is_bold=True)
         font_reg = create_custom_font(int(size * 0.85), is_bold=False)
         font_dat = create_custom_font(int(size * 0.65), is_bold=False)
@@ -223,11 +226,10 @@ if uploaded_files:
 
             width, height = image.size
             
-            # 💡 [여백 보정 구역] 가로형 사진일 때 패딩(p)과 두께(t)가 너무 작아지지 않도록 인자 스왑 연산 추가
+            # 💡 [하단 전체 여백 제어] 가로형 사진일 때 글자가 밑으로 밀리는 크기만큼 하단 판을 넓혀줍니다.
             if width > height:
-                # 가로가 더 길면 높이 대신 '가로' 길이를 스케일의 기준으로 세워 여백 확보
                 thickness = get_thickness(width)
-                padding = int(get_padding(width) * 0.85)  # 너무 넓어지지 않게 0.85 보정 계수 적용
+                padding = int(get_padding(width) * 1.1)  # 사진 간격을 띄운 만큼 전체 흰 바닥을 넉넉히 1.1배로 확장
             else:
                 thickness = get_thickness(height)
                 padding = get_padding(height)
@@ -236,7 +238,6 @@ if uploaded_files:
 
             st.subheader(f"🖼️ 파일: {uploaded_files.name if hasattr(uploaded_files, 'name') else uploaded_file.name}")
             
-            # --- [🛠️ GPS 검출 여부 미리 파악하기] ---
             show_timezone_selector = True 
             
             try:
@@ -253,7 +254,7 @@ if uploaded_files:
 
             tz_options = [
                 "UTC+09:00 (한국/일본/인도네시아 동부)",
-                "UTC+08:00 (중국/대만/홍콩/싱가포르/필리핀)",
+                "UTC+08:00 (중국/대만/홍콩/싱가포爾/필리핀)",
                 "UTC+07:00 (베트남/태국/인도네시아 서부)",
                 "UTC+05:30 (인도/스리랑카)",
                 "UTC+04:00 (두바이/아랍에미리트/오만)",
