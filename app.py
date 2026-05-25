@@ -55,9 +55,9 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     font_dat = date_font(p)
     size, d_size = font_size(p)
     
-    # 💡 가로형 사진(w > h)일 경우, 하단 여백 내에서 글자가 찌그러지지 않도록 폰트 크기 강제 폰트 스케일 업
+    # 💡 [글자 크기 미세 조정] 가로형 사진일 때 너무 커지지 않도록 배율을 1.15배로 대폭 낮췄습니다.
     if w > h:
-        scale_up_factor = 1.35  
+        scale_up_factor = 1.15  
         size = int(size * scale_up_factor)
         d_size = int(d_size * scale_up_factor)
     
@@ -132,13 +132,13 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
 
     line_spacing = int(size * 0.2)
     
-    # 💡 [여백 추가 핵심 타깃]
-    # 가로형 사진일 때, 사진 바로 밑에 붙지 않도록 의도적으로 시작 높이(start_y)를 밀어내 간격을 만듭니다.
+    # 💡 [사진과 글자 사이 간격 유지]
+    # 글자 크기는 작아졌지만 간격(gap)을 p(하단 여백)의 22%만큼 줘서 확실히 떨어뜨립니다.
     if w > h:
-        gap = int(size * 0.7)  # 가로형 사진일 때 사진과 글자 사이 마진 폭 (숫자를 키우면 더 멀어집니다)
+        gap = int(p * 0.22)  
         start_y = h + t + gap
     else:
-        start_y = h + (p - (size + line_spacing + d_size)) // 2  # 세로형 사진은 기존 정중앙 밸런스 유지
+        start_y = h + (p - (size + line_spacing + d_size)) // 2  
         
     visual_center_y = int(start_y + (size * 0.62)) 
     
@@ -174,6 +174,7 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
         if scale_factor < 0.8:
             camera_stroke_width = max(1, int(new_size * 0.03))
     elif w > h:
+        # 가로형일 때 줄어든 size 밸런스에 맞춰 다시 생성
         font_obj = create_custom_font(size, is_bold=True)
         font_reg = create_custom_font(int(size * 0.85), is_bold=False)
         font_dat = create_custom_font(int(size * 0.65), is_bold=False)
@@ -226,10 +227,10 @@ if uploaded_files:
 
             width, height = image.size
             
-            # 💡 [하단 전체 여백 제어] 가로형 사진일 때 글자가 밑으로 밀리는 크기만큼 하단 판을 넓혀줍니다.
             if width > height:
                 thickness = get_thickness(width)
-                padding = int(get_padding(width) * 1.1)  # 사진 간격을 띄운 만큼 전체 흰 바닥을 넉넉히 1.1배로 확장
+                # 💡 하단 흰색 여백(padding)은 충분히 확보하되, 텍스트만 위쪽으로 적당히 떨어트립니다.
+                padding = int(get_padding(width) * 0.95)  
             else:
                 thickness = get_thickness(height)
                 padding = get_padding(height)
@@ -254,7 +255,7 @@ if uploaded_files:
 
             tz_options = [
                 "UTC+09:00 (한국/일본/인도네시아 동부)",
-                "UTC+08:00 (중국/대만/홍콩/싱가포爾/필리핀)",
+                "UTC+08:00 (중국/대만/홍콩/싱가포르/필리핀)",
                 "UTC+07:00 (베트남/태국/인도네시아 서부)",
                 "UTC+05:30 (인도/스리랑카)",
                 "UTC+04:00 (두바이/아랍에미리트/오만)",
