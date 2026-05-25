@@ -55,9 +55,9 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     font_dat = date_font(p)
     size, d_size = font_size(p)
     
-    # 가로형 사진(w > h)일 때 폰트 스케일 고정 (1.15배)
+    # 💡 [글자 크기 상향] 가로형 사진(w > h)일 때 글자 크기 배율을 1.3배로 키웠습니다.
     if w > h:
-        scale_up_factor = 1.15  
+        scale_up_factor = 1.30  
         size = int(size * scale_up_factor)
         d_size = int(d_size * scale_up_factor)
     
@@ -132,10 +132,10 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
 
     line_spacing = int(size * 0.2)
     
-    # 💡 [순수 마진 오프셋 반영 구역]
-    # 오리지널 패딩 사이즈(p)를 보존하면서 가로형 사진 하단에만 자연스럽게 글자 위치를 내려줍니다.
+    # 💡 [오리지널 패딩 보존 + 글자 크기 비례 간격 튜닝]
+    # 전체 패딩(p) 내에서 커진 폰트 크기에 어울리도록 여백 시작점을 잡아줍니다.
     if w > h:
-        gap = int(p * 0.15)  
+        gap = int(p * 0.12)  
         start_y = h + t + gap
     else:
         start_y = h + (p - (size + line_spacing + d_size)) // 2  
@@ -174,6 +174,7 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
         if scale_factor < 0.8:
             camera_stroke_width = max(1, int(new_size * 0.03))
     elif w > h:
+        # 커진 size 밸런스에 맞춰 최종 폰트 객체 매핑
         font_obj = create_custom_font(size, is_bold=True)
         font_reg = create_custom_font(int(size * 0.85), is_bold=False)
         font_dat = create_custom_font(int(size * 0.65), is_bold=False)
@@ -226,8 +227,7 @@ if uploaded_files:
 
             width, height = image.size
             
-            # 💡 [오리지널 패딩 보존] 
-            # 외부 모듈의 연산 그대로 width/height 조건식 없이 깔끔하게 기존 로직으로 회귀했습니다.
+            # 💡 [오리지널 패딩 연산 100% 보존]
             thickness = get_thickness(height)
             padding = get_padding(height)
                 
