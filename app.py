@@ -55,7 +55,7 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     font_dat = date_font(p)
     size, d_size = font_size(p)
     
-    # 가로형 사진(w > h)일 때 적당한 폰트 스케일 고정 (1.15배)
+    # 가로형 사진(w > h)일 때 폰트 스케일 고정 (1.15배)
     if w > h:
         scale_up_factor = 1.15  
         size = int(size * scale_up_factor)
@@ -132,8 +132,8 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
 
     line_spacing = int(size * 0.2)
     
-    # 💡 [간격 2/3 축소 반영 구역] 
-    # 기존 p * 0.22 배수에서 p * 0.15 배수로 낮추어, 이전 간격의 딱 2/3 크기로 조율했습니다.
+    # 💡 [순수 마진 오프셋 반영 구역]
+    # 오리지널 패딩 사이즈(p)를 보존하면서 가로형 사진 하단에만 자연스럽게 글자 위치를 내려줍니다.
     if w > h:
         gap = int(p * 0.15)  
         start_y = h + t + gap
@@ -226,13 +226,10 @@ if uploaded_files:
 
             width, height = image.size
             
-            if width > height:
-                thickness = get_thickness(width)
-                # 💡 간격이 좁아진 만큼 흰색 하단 마진판 두께도 0.91배로 슬림하게 깎아 맞췄습니다.
-                padding = int(get_padding(width) * 0.91)  
-            else:
-                thickness = get_thickness(height)
-                padding = get_padding(height)
+            # 💡 [오리지널 패딩 보존] 
+            # 외부 모듈의 연산 그대로 width/height 조건식 없이 깔끔하게 기존 로직으로 회귀했습니다.
+            thickness = get_thickness(height)
+            padding = get_padding(height)
                 
             logo_file = logo(picture)
 
