@@ -21,9 +21,11 @@ st.set_page_config(page_title="폴라로이드 프레임 생성기", layout="cen
 
 st.markdown("""
     <style>
+    /* 따뜻하고 감성적인 스튜디오 톤 배경 */
     .stApp {
         background-color: #FBF9F6;
     }
+    /* 업로드 박스 디자인 고급화 */
     .stFileUploader {
         background-color: #ffffff;
         padding: 25px;
@@ -31,6 +33,7 @@ st.markdown("""
         box-shadow: 0px 8px 24px rgba(149, 157, 165, 0.06);
         border: 1px dashed #E2DFD9;
     }
+    /* 안내 문구 스타일 */
     .info-text {
         color: #6E6E6E;
         font-size: 0.95rem;
@@ -39,7 +42,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("폴라로이드 스타일 사진 프레임 생성기")
+st.title("📸 폴라로이드 스타일 사진 프레임 생성기")
 st.markdown('<p class="info-text">디지털 사진에 카메라 기종, 촬영 정보(EXIF), 그리고 감성적인 폴라로이드 테두리를 입혀줍니다.</p>', unsafe_allow_html=True)
 
 
@@ -78,30 +81,31 @@ def extract_exif_bytes(source_path):
 
 def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=None):
     # 기본 외부 폰트 설정 가져오기
-    font_obj = set_font(p)
+    font_obj = set_font(p)  
     font_reg = regular(p)
     font_dat = date_font(p)
     size, d_size = font_size(p)
-
-    # 가로형 사진(w > h)일 때 글자 크기 배율을 1.3배로 키웁니다.
+    
+    # 💡 [글자 크기 상향] 가로형 사진(w > h)일 때 글자 크기 배율을 1.3배로 키웠습니다.
     if w > h:
-        scale_up_factor = 1.30
+        scale_up_factor = 1.30  
         size = int(size * scale_up_factor)
         d_size = int(d_size * scale_up_factor)
-
+    
     draw = ImageDraw.Draw(canvas)
-
+    
     text_camera = pic.get_camera()
     text_info = f"f/{pic.get_f_number()}  {pic.get_shutter()}  ISO{pic.get_iso()}"
     text_lens = pic.get_lens() if hasattr(pic, "get_lens") else ""
     if not text_lens:
-        text_lens = "Lens Unspecified"   # 렌즈 정보가 없을 때 표시할 문구
+        text_lens = "Lens Unspecified"   # 👈 여기 문구를 취향껏 교체
 
+    
     utc_offset_str = chosen_utc if chosen_utc else "UTC+09:00"
     text_date = ""
     date_str = ""
     has_valid_gps = False
-
+    
     try:
         with Image.open(current_path) as img_exif:
             exif_data = img_exif._getexif()
@@ -162,52 +166,33 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
                 text_date = datetime.now().strftime(f"%Y-%b-%d %H:%M {chosen_utc}")
 
     line_spacing = int(size * 0.2)
-
+    
+    # 💡 [오리지널 패딩 보존 + 글자 크기 비례 간격 튜닝]
     # 전체 패딩(p) 내에서 커진 폰트 크기에 어울리도록 여백 시작점을 잡아줍니다.
     if w > h:
-        gap = int(p * 0.12)
+        gap = int(p * 0.12)  
         start_y = h + t + gap
     else:
-        start_y = h + (p - (size + line_spacing + d_size)) // 2
-
-    # 카메라명 + 렌즈 정보, 두 줄 사이의 간격
-    lens_gap = int(size * 0.15)
-    lens_y = int(start_y + size + lens_gap)
-
-    # 카메라명(첫 줄) + 렌즈 정보(둘째 줄)를 합친 전체 블록 높이
-    # 로고를 이 블록 높이만큼 키워서 두 줄 옆에 나란히 배치합니다.
-    block_height = size + lens_gap + d_size
-
+        start_y = h + (p - (size + line_spacing + d_size)) // 2  
+        
+    visual_center_y = int(start_y + (size * 0.62)) 
+    
     spacing = int(w * 0.01)
     current_x = t
+    lens_left_x = t   # 💡 로고 왼쪽 끝 기준점 (기본값: 로고 없을 때는 t와 동일)
 
     try:
         if l_file and os.path.exists(l_file):
             logo_img = Image.open(l_file).convert("RGBA")
-
-            # 1차: 두 줄 블록 높이 기준으로 로고 크기 계산
-            logo_h_by_height = block_height
-            logo_w_by_height = int(logo_img.width * (logo_h_by_height / logo_img.height))
-
-            # 로고 가로폭 상한선 (사진 전체 폭의 일정 비율을 넘지 않도록 제한)
-            # Canon처럼 가로로 넓은 워드마크 로고가 공간을 과하게 차지하지 않게 방지
-            max_logo_w = int(w * 0.13)
-
-            if logo_w_by_height > max_logo_w:
-                # 가로폭이 상한선을 넘으면, 가로폭 기준으로 다시 축소
-                logo_w = max_logo_w
-                logo_h = int(logo_img.height * (logo_w / logo_img.width))
-            else:
-                logo_w = logo_w_by_height
-                logo_h = logo_h_by_height
-
+            logo_h = int(size * 0.95) 
+            logo_w = int(logo_img.width * (logo_h / logo_img.height))
             logo_img = logo_img.resize((logo_w, logo_h), Image.Resampling.LANCZOS)
-
-            logo_x = int(t)
-            # 두 줄 블록 안에서 세로 중앙 정렬 (로고가 작아졌을 때 붕 뜨지 않도록)
-            logo_y = int(start_y + (block_height - logo_h) // 2)
+            
+            logo_x = int(current_x)
+            logo_y = int(visual_center_y - (logo_h // 2))
             canvas.paste(logo_img, (logo_x, logo_y), logo_img)
-
+            
+            lens_left_x = logo_x   # 💡 로고의 왼쪽 끝 x좌표를 렌즈 텍스트 기준점으로 저장
             current_x = logo_x + logo_w + int(spacing * 0.7)
     except: pass
 
@@ -216,9 +201,9 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     max_available_x = info_x - info_width - (spacing * 2)
     max_text_width = max_available_x - current_x
     current_text_width = draw.textlength(text_camera, font=font_obj)
-
+    
     camera_stroke_width = 0
-
+    
     if current_text_width > max_text_width:
         scale_factor = max(max_text_width / current_text_width, 0.4)
         new_size = int(size * scale_factor)
@@ -231,27 +216,27 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
         font_reg = create_custom_font(int(size * 0.85), is_bold=False)
         font_dat = create_custom_font(int(size * 0.65), is_bold=False)
 
-    # 카메라명 (로고 오른쪽, 첫 줄)
     draw.text(
-        (int(current_x), int(start_y)),
-        text_camera,
-        fill=(0, 0, 0),
-        font=font_obj,
+        (int(current_x), int(start_y)), 
+        text_camera, 
+        fill=(0, 0, 0), 
+        font=font_obj, 
         anchor="la",
-        stroke_width=camera_stroke_width,
-        stroke_fill=(0, 0, 0)
+        stroke_width=camera_stroke_width,  
+        stroke_fill=(0, 0, 0)              
     )
 
-    # 렌즈 정보 (로고 오른쪽, 둘째 줄 - 카메라명 바로 아래)
+    # 💡 로고 왼쪽 끝에 맞춘 렌즈 정보 (날짜와 동일 스타일)
     if text_lens:
+        lens_y = int(start_y + size + int(size * 0.15))
         draw.text(
-            (int(current_x), lens_y),
+            (int(lens_left_x), lens_y),
             text_lens,
             fill=(140, 140, 140),
             font=font_dat,
             anchor="la"
         )
-
+    
     draw.text((int(info_x), int(start_y)), text_info, fill=(50, 50, 50), font=font_reg, anchor="ra")
 
     if text_date:
@@ -259,6 +244,7 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
         draw.text((int(info_x), date_y), text_date, fill=(140, 140, 140), font=font_dat, anchor="ra")
 
     return canvas
+
 
 
 # 파일 업로더 컴포넌트
@@ -288,18 +274,25 @@ if uploaded_files:
             if image is None:
                 raise ValueError("이미지를 읽을 수 없습니다.")
 
-            width, height = image.size
+            # 🔍 디버그: 렌즈 EXIF 값 확인용 (확인 끝나면 이 블록 삭제하세요)
+            with st.expander(f"🔍 디버그 정보 - {uploaded_file.name}"):
+                st.write("LensModel (원본 EXIF):", repr(picture.exif.get("LensModel")))
+                st.write("LensSpecification (원본 EXIF):", repr(picture.exif.get("LensSpecification")))
+                st.write("get_lens() 결과:", repr(picture.get_lens()))
+                st.write("전체 EXIF 키 목록:", list(picture.exif.keys()))
 
-            # 오리지널 패딩 연산 100% 보존
+            width, height = image.size
+            
+            # 💡 [오리지널 패딩 연산 100% 보존]
             thickness = get_thickness(height)
             padding = get_padding(height)
-
+                
             logo_file = logo(picture)
 
-            st.subheader(f"파일: {uploaded_files.name if hasattr(uploaded_files, 'name') else uploaded_file.name}")
-
-            show_timezone_selector = True
-
+            st.subheader(f"🖼️ 파일: {uploaded_files.name if hasattr(uploaded_files, 'name') else uploaded_file.name}")
+            
+            show_timezone_selector = True 
+            
             try:
                 with Image.open(temp_path) as img_exif:
                     exif_data = img_exif._getexif()
@@ -308,9 +301,9 @@ if uploaded_files:
                     readable_exif = {TAGS.get(tag, tag): val for tag, val in exif_data.items()}
                     gps_info = readable_exif.get("GPSInfo", {})
                     if gps_info and 2 in gps_info and 4 in gps_info:
-                        show_timezone_selector = False
+                        show_timezone_selector = False 
             except:
-                pass
+                pass 
 
             tz_options = [
                 "UTC+09:00 (한국/일본/인도네시아 동부)",
@@ -330,7 +323,7 @@ if uploaded_files:
                 "UTC+10:00 (시드니/멜버른/호주 동부)",
                 "UTC+12:00 (뉴질랜드/피지)"
             ]
-
+            
             if show_timezone_selector:
                 def make_callback(fid=file_id, uid=unique_id):
                     return lambda: st.session_state.tz_dict.update({fid: st.session_state[f"selectbox_{uid}"]})
@@ -341,18 +334,18 @@ if uploaded_files:
                     current_index = 0
 
                 photo_timezone = st.selectbox(
-                    "GPS 정보가 없습니다. 적용할 타임존을 선택하세요.",
+                    f"⚠️ GPS 정보가 없습니다. 적용할 타임존을 선택하세요.",
                     tz_options,
                     index=current_index,
                     key=f"selectbox_{unique_id}",
                     on_change=make_callback()
                 )
-
+            
             single_chosen_utc = st.session_state.tz_dict[file_id].split(" ")[0]
 
             base_canvas = add_border(image, width, height, thickness, padding)
             final_canvas = place_model(
-                base_canvas, picture, width, height, thickness, padding, logo_file,
+                base_canvas, picture, width, height, thickness, padding, logo_file, 
                 chosen_utc=single_chosen_utc, current_path=temp_path
             )
 
@@ -368,17 +361,17 @@ if uploaded_files:
                 final_canvas.save(buf, format="JPEG", quality=95)
 
             st.download_button(
-                label=f"{uploaded_file.name} 저장",
+                label=f"📥 {uploaded_file.name} 저장",
                 data=buf.getvalue(),
                 file_name=f"result_{uploaded_file.name}",
                 key=f"btn_{unique_id}",
-                use_container_width=True
+                use_container_width=True 
             )
-
+            
         except Exception as e:
-            st.error(f"'{uploaded_file.name}' 처리 중 오류 발생: {e}")
+            st.error(f"⚠️ '{uploaded_file.name}' 처리 중 오류 발생: {e}")
             continue
-
+            
         st.divider()
 
     for path in temp_file_paths:
@@ -388,4 +381,4 @@ if uploaded_files:
             except:
                 pass
 else:
-    st.info("위 박스에 사진을 업로드하면 촬영 정보가 담긴 폴라로이드 프레임이 실시간으로 생성됩니다.")
+    st.info("💡 위 박스에 사진을 업로드하면 촬영 정보가 담긴 폴라로이드 프레임이 실시간으로 생성됩니다.")
