@@ -118,14 +118,27 @@ def get_exif_data(image_path):
             exif_dict[tag_name] = value
     return exif_dict
 
+# 모델명 앞에 브랜드가 중복되어도, 브랜드를 지워도 자연스럽게 읽히는 제조사만 여기 등록
+# (예: Canon EOS 800D -> EOS 800D 는 자연스럽지만, Leica Q2 -> Q2 는 어색함)
+BRANDS_SAFE_TO_STRIP = {
+    "CANON",       # Canon EOS 800D -> EOS 800D
+    "PANASONIC",   # Panasonic DMC-GX85 -> DMC-GX85
+    "SONY",        # SONY ILCE-7M3 -> ILCE-7M3 (원래도 중복 거의 없음)
+    "OLYMPUS",     # OLYMPUS E-M10 -> E-M10
+    "RICOH",       # RICOH GR III -> GR III (그나마 GR이라는 정체성 유지됨)
+}
+
 def clean_camera_name(exif):
-    """캐논 카메라의 경우 모델명 맨 앞의 'Canon' 접두어를 제거한다.
-    다른 브랜드는 영향받지 않는다."""
+    """지워도 자연스러운 브랜드에 한해, 모델명 맨 앞의 중복된 제조사명을 제거한다.
+    라이카, 니콘처럼 모델명이 짧아 브랜드가 있어야 알아보기 쉬운 경우는 그대로 둔다."""
     make = exif.get("Make", "")
     model = exif.get("Model", "Unknown Camera")
 
-    if make and "canon" in make.lower():
-        model = re.sub(r"^\s*canon\s+", "", model, flags=re.IGNORECASE).strip()
+    if make:
+        make_keyword = make.split()[0] if make.split() else make
+        if make_keyword.upper() in BRANDS_SAFE_TO_STRIP:
+            pattern = re.compile(r"^\s*" + re.escape(make_keyword) + r"\s+", re.IGNORECASE)
+            model = pattern.sub("", model).strip()
 
     return model
 
