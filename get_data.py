@@ -118,6 +118,17 @@ def get_exif_data(image_path):
             exif_dict[tag_name] = value
     return exif_dict
 
+def clean_camera_name(exif):
+    """캐논 카메라의 경우 모델명 맨 앞의 'Canon' 접두어를 제거한다.
+    다른 브랜드는 영향받지 않는다."""
+    make = exif.get("Make", "")
+    model = exif.get("Model", "Unknown Camera")
+
+    if make and "canon" in make.lower():
+        model = re.sub(r"^\s*canon\s+", "", model, flags=re.IGNORECASE).strip()
+
+    return model
+
 def get_shutter(exif): 
     shutter = exif.get("ExposureTime", "?") 
     if shutter: 
@@ -203,7 +214,7 @@ class Picture():
         self.image_path = image_path 
         self.exif = get_exif_data(image_path) 
         self.image = ImageOps.exif_transpose(img) 
-        self.camera = self.exif.get("Model", "Unknown Camera") 
+        self.camera = clean_camera_name(self.exif) 
         self.iso = self.exif.get("ISOSpeedRatings", "?") 
         
         f_val = self.exif.get("FNumber", "?")
