@@ -178,18 +178,34 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     # 로고를 이 블록 높이만큼 키워서 두 줄 옆에 나란히 배치합니다.
     block_height = size + lens_gap + d_size
 
-    spacing = int(w * 0.01)
+        spacing = int(w * 0.01)
     current_x = t
 
     try:
         if l_file and os.path.exists(l_file):
             logo_img = Image.open(l_file).convert("RGBA")
-            logo_h = int(block_height)   # 로고 높이 = 카메라명+렌즈 두 줄 블록 높이
-            logo_w = int(logo_img.width * (logo_h / logo_img.height))
+
+            # 1차: 두 줄 블록 높이 기준으로 로고 크기 계산
+            logo_h_by_height = block_height
+            logo_w_by_height = int(logo_img.width * (logo_h_by_height / logo_img.height))
+
+            # 로고 가로폭 상한선 (사진 전체 폭의 일정 비율을 넘지 않도록 제한)
+            # Canon처럼 가로로 넓은 워드마크 로고가 공간을 과하게 차지하지 않게 방지
+            max_logo_w = int(w * 0.13)
+
+            if logo_w_by_height > max_logo_w:
+                # 가로폭이 상한선을 넘으면, 가로폭 기준으로 다시 축소
+                logo_w = max_logo_w
+                logo_h = int(logo_img.height * (logo_w / logo_img.width))
+            else:
+                logo_w = logo_w_by_height
+                logo_h = logo_h_by_height
+
             logo_img = logo_img.resize((logo_w, logo_h), Image.Resampling.LANCZOS)
 
             logo_x = int(t)
-            logo_y = int(start_y)   # 로고 상단을 카메라명 텍스트 상단에 맞춤
+            # 두 줄 블록 안에서 세로 중앙 정렬 (로고가 작아졌을 때 붕 뜨지 않도록)
+            logo_y = int(start_y + (block_height - logo_h) // 2)
             canvas.paste(logo_img, (logo_x, logo_y), logo_img)
 
             current_x = logo_x + logo_w + int(spacing * 0.7)
