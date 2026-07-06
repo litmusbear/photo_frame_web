@@ -178,7 +178,7 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     # 로고를 이 블록 높이만큼 키워서 두 줄 옆에 나란히 배치합니다.
     block_height = size + lens_gap + d_size
 
-        spacing = int(w * 0.01)
+    spacing = int(w * 0.01)
     current_x = t
 
     try:
