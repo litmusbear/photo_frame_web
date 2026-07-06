@@ -197,33 +197,12 @@ def lookup_known_lens(camera_model):
 
 
 def get_lens(exif, camera_model=""):
-    # 1순위: EXIF LensModel
+    # 1순위: EXIF LensModel (실제 렌즈명이 박혀있는 경우, 가장 신뢰도 높음)
     lens = exif.get("LensModel", "")
     if lens:
         return lens.strip()
 
-    # 2순위: LensSpecification(초점거리 범위)
-    spec = exif.get("LensSpecification", None)
-    if spec:
-        try:
-            min_focal, max_focal = spec[0], spec[1]
-            if min_focal == max_focal:
-                return f"{int(min_focal)}mm"
-            return f"{int(min_focal)}-{int(max_focal)}mm"
-        except:
-            pass
-
-    # 3순위: FocalLength 단독 태그
-    focal = exif.get("FocalLength", None)
-    if focal:
-        try:
-            if isinstance(focal, tuple):
-                focal = focal[0] / focal[1]
-            return f"{int(round(focal))}mm"
-        except:
-            pass
-
-    # 4순위: 유명 번들렌즈 카메라 DB 매칭
+    # 2순위: 유명 번들렌즈 카메라 DB 매칭
     known = lookup_known_lens(camera_model)
     if known:
         return known
