@@ -197,15 +197,21 @@ def lookup_known_lens(camera_model):
 
 
 def get_lens(exif, camera_model=""):
-    # 1순위: EXIF LensModel (실제 렌즈명이 박혀있는 경우, 가장 신뢰도 높음)
+    # 1순위: 유명 번들렌즈 카메라 DB 매칭
+    # → 고정렌즈 카메라는 EXIF의 LensModel이 있어도 "24.0mm f/2.8"처럼
+    #   브랜드명 없는 밋밋한 자동생성 문자열인 경우가 많아서, 
+    #   DB에 등록된 정확한 렌즈명(Elmarit 등)을 우선시합니다.
+    known = lookup_known_lens(camera_model)
+    if known:
+        return known
+
+    # 2순위: EXIF LensModel (교환렌즈 카메라 등 DB에 없는 경우의 fallback)
     lens = exif.get("LensModel", "")
     if lens:
         return lens.strip()
 
-    # 2순위: 유명 번들렌즈 카메라 DB 매칭
-    known = lookup_known_lens(camera_model)
-    if known:
-        return known
+    # 여기까지 왔으면 렌즈 정보를 알아낼 방법이 없음
+    return ""
 
     # 여기까지 왔으면 렌즈 정보를 알아낼 방법이 없음
     return ""
