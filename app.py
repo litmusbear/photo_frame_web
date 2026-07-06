@@ -80,12 +80,14 @@ def extract_exif_bytes(source_path):
 
 
 def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=None):
-    # 1. 기본 폰트 크기 세팅
-    base_size, d_size = font_size(p)
+    # 1. 폰트 크기 및 행간 비율 조정
+    size, d_size = font_size(p)
     
-    # 💡 가로형 사진(w > h)일 때 기본 글자 크기 배율 상향
+    # 💡 가로형 사진(w > h)일 때 글자 크기 배율을 '조금 더 작게' 조정 (1.30 -> 1.25)
+    # 💡 날짜 크기(d_size)는 더 줄여서 밸런스 조정
     if w > h:
-        base_size = int(base_size * 1.30)
+        size = int(size * 1.25)  
+        d_size = int(d_size * 0.9) 
 
     draw = ImageDraw.Draw(canvas)
     
@@ -95,11 +97,12 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     if not text_lens:
         text_lens = "Lens Unspecified"
 
-    # --- (중략: 기존 날짜/GPS 추출 로직은 그대로 유지) ---
     utc_offset_str = chosen_utc if chosen_utc else "UTC+09:00"
     text_date = ""
     date_str = ""
     has_valid_gps = False
+    
+    # --- (중략: 기존 GPS 및 날짜 추출 로직은 동일) ---
     try:
         with Image.open(current_path) as img_exif:
             exif_data = img_exif._getexif()
@@ -119,6 +122,7 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
                     if readable_exif.get("GPSLongitudeRef", "E") == "W": lon = -lon
                     if abs(lat) > 0.001 and abs(lon) > 0.001: coords = (lat, lon)
                 except: coords = None
+
             if coords:
                 try:
                     from timezonefinder import TimezoneFinder
@@ -136,11 +140,13 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
                         has_valid_gps = True
                 except: pass
     except: pass
+
     if has_valid_gps and date_str:
         try:
             dt = datetime.strptime(date_str, "%Y:%m:%d %H:%M:%S")
             text_date = dt.strftime(f"%Y-%b-%d %H:%M {utc_offset_str}")
         except: pass
+
     if not text_date:
         if date_str:
             try:
@@ -153,95 +159,98 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
                 dt = datetime.fromtimestamp(file_mtime)
                 text_date = dt.strftime(f"%Y-%b-%d %H:%M {chosen_utc}")
             except: text_date = datetime.now().strftime(f"%Y-%b-%d %H:%M {chosen_utc}")
-    # --- (날짜 로직 끝) ---
+    # --- (추출 로직 끝) ---
 
-    # 2. 우측 촬영 정보 글자 크기에 맞춰 레이아웃 마진 확보
-    font_reg_temp = create_custom_font(int(base_size * 0.85), is_bold=False)
-    info_x = t + w
-    info_width = draw.textlength(text_info, font=font_reg_temp)
+    # 💡 [핵심 수정 1] 행간 비율 확대
+    # 가로 사진에서 늘어난 글자 크기에 맞춰 더 넓은 행간을 확보합니다.
+    if w > h:
+        line_spacing = int(size * 0.45) 
+    else:
+        line_spacing = int(size * 0.2)
+    
+    # 💡 [핵심 수정 2] Y축 시작 좌표 계산 방식 통일 및 정돈
+    # 가로 사진 특수 공식을 제거하고 전체 패딩(p) 내에서 수직 중앙 정렬되도록 규칙을 단일화합니다.
+    total_text_height = size + line_spacing + d_size
+    start_y = h + (p - total_text_height) // 2  
+        
+    visual_center_y = int(start_y + (size * 0.5)) 
     
     spacing = int(w * 0.01)
     current_x = t
-    
-    # 로고 가상 크기 계산 (시작점 확정을 위해 미리 계산)
-    logo_w = 0
-    if l_file and os.path.exists(l_file):
-        try:
-            with Image.open(l_file) as logo_img:
-                logo_w = int(logo_img.width * ((base_size * 0.95) / logo_img.height))
-        except: pass
-
-    # 💡 3. 핵심: 기종명이 너무 길 때 동적으로 글자 크기를 축소하는 로직 (최종 크기를 `final_size`로 확정)
     lens_left_x = t
-    if logo_w > 0:
-        lens_left_x = current_x
-        current_x = current_x + logo_w + int(spacing * 0.7)
-        
-    max_available_x = info_x - info_width - (spacing * 2)
-    max_text_width = max_available_x - current_x
-    
-    font_obj_temp = create_custom_font(base_size, is_bold=True)
-    current_text_width = draw.textlength(text_camera, font=font_obj_temp)
-    
-    final_size = base_size
-    camera_stroke_width = 0
-    
-    if current_text_width > max_text_width:
-        scale_factor = max(max_text_width / current_text_width, 0.4)
-        final_size = int(base_size * scale_factor)
-        if scale_factor < 0.8:
-            camera_stroke_width = max(1, int(final_size * 0.03))
 
-    # 💡 4. 최종 확정된 `final_size`를 기반으로 모든 폰트와 행간 정렬 공식을 통일
-    font_obj = create_custom_font(final_size, is_bold=True)
-    font_reg = create_custom_font(int(final_size * 0.85), is_bold=False)
-    font_dat = create_custom_font(int(final_size * 0.65), is_bold=False)
-
-    # 겹침 방지의 핵심: 최종 크기에 비례하는 행간 설정
-    line_spacing = int(final_size * 0.35) 
-    
-    # 위아래 요소를 포함한 전체 텍스트 박스의 높이
-    total_text_height = final_size + line_spacing + int(final_size * 0.65)
-    
-    # 💡 기존의 `w > h` 분기 공식을 제거하고 완전히 p(패딩) 중앙에 위치하도록 통일
-    start_y = h + (p - total_text_height) // 2  
-    visual_center_y = int(start_y + (final_size * 0.5)) 
-
-    # 5. 실제 로고 및 텍스트 그리기
-    if logo_w > 0:
-        try:
+    # 로고 그리기
+    try:
+        if l_file and os.path.exists(l_file):
             logo_img = Image.open(l_file).convert("RGBA")
-            logo_h = int(final_size * 0.95) 
+            logo_h = int(size * 0.95) 
             logo_w = int(logo_img.width * (logo_h / logo_img.height))
             logo_img = logo_img.resize((logo_w, logo_h), Image.Resampling.LANCZOS)
-            canvas.paste(logo_img, (int(lens_left_x), int(visual_center_y - (logo_h // 2))), logo_img)
-        except: pass
+            
+            logo_x = int(current_x)
+            logo_y = int(visual_center_y - (logo_h // 2))
+            canvas.paste(logo_img, (logo_x, logo_y), logo_img)
+            
+            lens_left_x = logo_x
+            current_x = logo_x + logo_w + int(spacing * 0.7)
+    except: pass
 
-    # 기종명 출력
+    # 💡 [핵심 수정 3] 긴 기종명에 대한 폰트 자동 축소 로직 강화
+    # 우측 정보 영역과의 간격을 더 확보하고, 필요시 글자 크기를 더 과감하게 줄입니다.
+    # custom_font 인스턴스를 루프 밖에서 미리 정의
+    font_reg = create_custom_font(int(size * 0.85), is_bold=False)
+    font_dat = create_custom_font(int(d_size), is_bold=False)
+
+    info_x = t + w
+    info_width = draw.textlength(text_info, font=font_reg)
+    max_available_x = info_x - info_width - (spacing * 2.5) # 간격 조금 더 확보
+    max_text_width = max_available_x - current_x
+    
+    font_obj_temp = create_custom_font(size, is_bold=True)
+    current_text_width = draw.textlength(text_camera, font=font_obj_temp)
+    
+    camera_stroke_width = 0
+    final_camera_font = font_obj_temp
+
+    if current_text_width > max_text_width:
+        scale_factor = max(max_text_width / current_text_width, 0.4)
+        new_size = int(size * scale_factor)
+        final_camera_font = create_custom_font(new_size, is_bold=True)
+        if scale_factor < 0.8:
+            camera_stroke_width = max(1, int(new_size * 0.03))
+
+    # 기종명 그리기
     draw.text(
         (int(current_x), int(start_y)), 
         text_camera, 
         fill=(0, 0, 0), 
-        font=font_obj, 
+        font=final_camera_font, 
         anchor="la",
         stroke_width=camera_stroke_width,  
         stroke_fill=(0, 0, 0)              
     )
 
-    # 렌즈명 출력 (기종명 아래)
+    # 렌즈 정보 그리기 (기종명 아래)
     if text_lens:
-        lens_y = int(start_y + final_size + line_spacing)
-        draw.text((int(lens_left_x), lens_y), text_lens, fill=(140, 140, 140), font=font_dat, anchor="la")
+        lens_y = int(start_y + size + line_spacing)
+        draw.text(
+            (int(lens_left_x), lens_y),
+            text_lens,
+            fill=(140, 140, 140),
+            font=font_dat,
+            anchor="la"
+        )
     
-    # 촬영 정보 출력 (우측 상단)
+    # 촬영 정보 그리기 (우측 상단)
     draw.text((int(info_x), int(start_y)), text_info, fill=(50, 50, 50), font=font_reg, anchor="ra")
 
-    # 날짜 출력 (우측 하단)
+    # 날짜 그리기 (우측 하단)
     if text_date:
-        date_y = int(start_y + final_size + line_spacing)
+        date_y = int(start_y + size + line_spacing)
         draw.text((int(info_x), date_y), text_date, fill=(140, 140, 140), font=font_dat, anchor="ra")
 
     return canvas
+
 
 
 
