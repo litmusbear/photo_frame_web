@@ -5,6 +5,12 @@ import os
 import io
 from datetime import datetime
 
+try:
+    import piexif
+    HAS_PIEXIF = True
+except ImportError:
+    HAS_PIEXIF = False
+
 from get_data import Picture
 from font import *
 from logo import logo
@@ -46,6 +52,31 @@ def add_border(img, w, h, t, p):
     canvas = Image.new("RGB", (border_width, border_height), (255, 255, 255))
     canvas.paste(img, (t, t))
     return canvas
+
+
+def extract_exif_bytes(source_path):
+    """
+    원본 이미지 파일에서 EXIF 메타데이터를 추출.
+    piexif가 있으면 Orientation을 1로 정규화해서 캔버스 크기 변경으로 인한
+    이중 회전 문제를 방지. 없으면 PIL의 기본 EXIF 파싱 결과로 폴백.
+    """
+    if HAS_PIEXIF:
+        try:
+            exif_dict = piexif.load(source_path)
+            exif_dict["0th"][piexif.ImageIFD.Orientation] = 1
+            return piexif.dump(exif_dict)
+        except Exception:
+            pass
+
+    try:
+        with Image.open(source_path) as img:
+            exif_data = img.info.get("exif")
+        if exif_data:
+            return exif_data
+    except Exception:
+        pass
+
+    return None
 
 
 def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=None):
@@ -295,8 +326,15 @@ if uploaded_files:
 
             st.image(final_canvas, caption=f"결과물: {uploaded_file.name}", use_container_width=True)
 
+            # 원본 EXIF 메타데이터 추출 및 저장
+            exif_bytes = extract_exif_bytes(temp_path)
+
             buf = io.BytesIO()
-            final_canvas.save(buf, format="JPEG", quality=95)
+            if exif_bytes:
+                final_canvas.save(buf, format="JPEG", quality=95, exif=exif_bytes)
+            else:
+                final_canvas.save(buf, format="JPEG", quality=95)
+
             st.download_button(
                 label=f"📥 {uploaded_file.name} 저장",
                 data=buf.getvalue(),
