@@ -79,6 +79,27 @@ def get_datetime(exif):
 
     return dt.strftime(f"%Y-%b-%d %H:%M {utc_offset_str}")
 
+def get_lens(exif):
+    # 렌즈 모델명이 있으면 우선 사용
+    lens = exif.get("LensModel", "")
+    if lens:
+        return lens.strip()
+
+    # 없으면 LensSpecification(초점거리 범위, 조리개 범위)으로 대체 구성
+    spec = exif.get("LensSpecification", None)
+    if spec:
+        try:
+            min_focal, max_focal = spec[0], spec[1]
+            if min_focal == max_focal:
+                focal_str = f"{int(min_focal)}mm"
+            else:
+                focal_str = f"{int(min_focal)}-{int(max_focal)}mm"
+            return focal_str
+        except:
+            pass
+
+    return ""
+
 class Picture():
     def __init__(self, image_path):
         img = Image.open(image_path)
@@ -90,6 +111,7 @@ class Picture():
         self.f_number = float(round(self.exif.get("FNumber", "?"),1))
         self.shutter = get_shutter(self.exif)
         self.datetime = get_datetime(self.exif)
+        self.lens = get_lens(self.exif)
 
     def get_image(self):
         return self.image
@@ -108,3 +130,6 @@ class Picture():
 
     def get_datetime(self):
         return self.datetime
+
+    def get_lens(self):
+        return self.lens
