@@ -86,26 +86,26 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     font_dat = date_font(p)
     size, d_size = font_size(p)
     
-    # 💡 [글자 크기 상향] 가로형 사진(w > h)일 때 글자 크기 배율을 1.3배로 키웠습니다.
+    # 💡 가로형 사진(w > h)일 때 글자 크기 배율을 1.3배로 키움
     if w > h:
         scale_up_factor = 1.30  
         size = int(size * scale_up_factor)
         d_size = int(d_size * scale_up_factor)
-    
+
     draw = ImageDraw.Draw(canvas)
     
     text_camera = pic.get_camera()
     text_info = f"f/{pic.get_f_number()}  {pic.get_shutter()}  ISO{pic.get_iso()}"
     text_lens = pic.get_lens() if hasattr(pic, "get_lens") else ""
     if not text_lens:
-        text_lens = "Lens Unspecified"   # 👈 여기 문구를 취향껏 교체
+        text_lens = "Lens Unspecified"
 
-    
     utc_offset_str = chosen_utc if chosen_utc else "UTC+09:00"
     text_date = ""
     date_str = ""
     has_valid_gps = False
     
+    # --- (중략: 기존 GPS 및 날짜 추출 로직은 동일하게 유지) ---
     try:
         with Image.open(current_path) as img_exif:
             exif_data = img_exif._getexif()
@@ -123,8 +123,7 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
                     if readable_exif.get("GPSLatitudeRef", "N") == "S": lat = -lat
                     lon = to_degrees(gps_info[4])
                     if readable_exif.get("GPSLongitudeRef", "E") == "W": lon = -lon
-                    if abs(lat) > 0.001 and abs(lon) > 0.001:
-                        coords = (lat, lon)
+                    if abs(lat) > 0.001 and abs(lon) > 0.001: coords = (lat, lon)
                 except: coords = None
 
             if coords:
@@ -164,23 +163,28 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
                 text_date = dt.strftime(f"%Y-%b-%d %H:%M {chosen_utc}")
             except:
                 text_date = datetime.now().strftime(f"%Y-%b-%d %H:%M {chosen_utc}")
+    # --- (추출 로직 끝) ---
 
-    line_spacing = int(size * 0.2)
+    # 💡 폰트 객체 최종 재생성 및 매핑 (사이즈 밸런스 조정)
+    font_obj = create_custom_font(size, is_bold=True)
+    font_reg = create_custom_font(int(size * 0.85), is_bold=False)
+    font_dat = create_custom_font(int(size * 0.65), is_bold=False)
+
+    # 행간을 늘어난 글자 크기에 비례하여 동적으로 계산
+    line_spacing = int(size * 0.35) 
     
-    # 💡 [오리지널 패딩 보존 + 글자 크기 비례 간격 튜닝]
-    # 전체 패딩(p) 내에서 커진 폰트 크기에 어울리도록 여백 시작점을 잡아줍니다.
-    if w > h:
-        gap = int(p * 0.12)  
-        start_y = h + t + gap
-    else:
-        start_y = h + (p - (size + line_spacing + d_size)) // 2  
+    # 💡 상하 정렬을 위해 전체 패딩(p) 내에서 텍스트 영역의 시작 y축(start_y)을 일관되게 연산
+    # 가로/세로 분기 없이 패딩 영역 중앙에 배치되도록 정렬 규칙을 통일합니다.
+    total_text_height = size + line_spacing + int(size * 0.65)
+    start_y = h + (p - total_text_height) // 2  
         
-    visual_center_y = int(start_y + (size * 0.62)) 
+    visual_center_y = int(start_y + (size * 0.5)) 
     
     spacing = int(w * 0.01)
     current_x = t
-    lens_left_x = t   # 💡 로고 왼쪽 끝 기준점 (기본값: 로고 없을 때는 t와 동일)
+    lens_left_x = t
 
+    # 로고 배치
     try:
         if l_file and os.path.exists(l_file):
             logo_img = Image.open(l_file).convert("RGBA")
@@ -192,7 +196,7 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
             logo_y = int(visual_center_y - (logo_h // 2))
             canvas.paste(logo_img, (logo_x, logo_y), logo_img)
             
-            lens_left_x = logo_x   # 💡 로고의 왼쪽 끝 x좌표를 렌즈 텍스트 기준점으로 저장
+            lens_left_x = logo_x
             current_x = logo_x + logo_w + int(spacing * 0.7)
     except: pass
 
@@ -210,12 +214,8 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
         font_obj = create_custom_font(new_size, is_bold=True)
         if scale_factor < 0.8:
             camera_stroke_width = max(1, int(new_size * 0.03))
-    elif w > h:
-        # 커진 size 밸런스에 맞춰 최종 폰트 객체 매핑
-        font_obj = create_custom_font(size, is_bold=True)
-        font_reg = create_custom_font(int(size * 0.85), is_bold=False)
-        font_dat = create_custom_font(int(size * 0.65), is_bold=False)
 
+    # 기종명 우측 배치 (anchor="la")
     draw.text(
         (int(current_x), int(start_y)), 
         text_camera, 
@@ -226,9 +226,9 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
         stroke_fill=(0, 0, 0)              
     )
 
-    # 💡 로고 왼쪽 끝에 맞춘 렌즈 정보 (날짜와 동일 스타일)
+    # 렌즈 정보 배치 (기종명 아래)
     if text_lens:
-        lens_y = int(start_y + size + int(size * 0.15))
+        lens_y = int(start_y + size + line_spacing)
         draw.text(
             (int(lens_left_x), lens_y),
             text_lens,
@@ -237,8 +237,10 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
             anchor="la"
         )
     
+    # 촬영 정보 배치 (우측 상단)
     draw.text((int(info_x), int(start_y)), text_info, fill=(50, 50, 50), font=font_reg, anchor="ra")
 
+    # 날짜 정보 배치 (우측 하단)
     if text_date:
         date_y = int(start_y + size + line_spacing)
         draw.text((int(info_x), date_y), text_date, fill=(140, 140, 140), font=font_dat, anchor="ra")
