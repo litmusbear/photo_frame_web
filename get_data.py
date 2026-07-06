@@ -190,6 +190,8 @@ return lens_spec
 return ""
 
 
+import re
+
 def get_lens(exif, camera_model=""):
     # 1순위: 유명 번들렌즈 카메라 DB 매칭
     known = lookup_known_lens(camera_model)
@@ -201,16 +203,19 @@ def get_lens(exif, camera_model=""):
     if lens:
         lens_str = lens.strip()
         
-        # 💡 [보완] 대소문자 구분 없이 맨 앞의 카메라 모델명을 제거합니다.
         if camera_model:
-            model_lower = camera_model.lower().strip()
-            if lens_str.lower().startswith(model_lower):
-                # 카메라명 길이만큼 잘라낸 후, 남아있는 공백 및 불필요한 특수문자(, 또는 -) 제거
-                lens_str = lens_str[len(model_lower):].strip(" ,-_")
+            # 💡 [해결책] 대소문자 구분 없이 카메라 모델명 문자열을 찾아서 강제로 공백 처리합니다.
+            # 예: "iPhone 11 Pro"가 렌즈명 어디에 있든 상관없이 제거
+            pattern = re.compile(re.escape(camera_model), re.IGNORECASE)
+            lens_str = pattern.sub("", lens_str).strip()
+            
+            # 카메라명 제거 후 맨 앞에 남은 불필요한 공백, 쉼표, 기호들 깔끔하게 정리
+            lens_str = lens_str.strip(" ,-_")
             
         return lens_str
 
     return ""
+
 
 
 # 여기까지 왔으면 렌즈 정보를 알아낼 방법이 없음
