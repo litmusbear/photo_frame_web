@@ -275,12 +275,16 @@ if uploaded_files:
                 raise ValueError("이미지를 읽을 수 없습니다.")
 
             # 🔍 디버그: 렌즈 EXIF 값 확인용 (확인 끝나면 이 블록 삭제하세요)
+                        # 🔍 디버그: 렌즈 + 카메라명 EXIF 값 확인용 (확인 끝나면 이 블록 삭제하세요)
             with st.expander(f"🔍 디버그 정보 - {uploaded_file.name}"):
+                st.write("Make (원본 EXIF):", repr(picture.exif.get("Make")))
+                st.write("Model (원본 EXIF):", repr(picture.exif.get("Model")))
+                st.write("get_camera() 결과:", repr(picture.get_camera()))
                 st.write("LensModel (원본 EXIF):", repr(picture.exif.get("LensModel")))
                 st.write("LensSpecification (원본 EXIF):", repr(picture.exif.get("LensSpecification")))
                 st.write("get_lens() 결과:", repr(picture.get_lens()))
                 st.write("전체 EXIF 키 목록:", list(picture.exif.keys()))
-
+                
             width, height = image.size
             
             # 💡 [오리지널 패딩 연산 100% 보존]
