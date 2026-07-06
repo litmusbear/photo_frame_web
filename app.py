@@ -179,6 +179,7 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     
     spacing = int(w * 0.01)
     current_x = t
+    lens_left_x = t   # 💡 로고 왼쪽 끝 기준점 (기본값: 로고 없을 때는 t와 동일)
 
     try:
         if l_file and os.path.exists(l_file):
@@ -191,6 +192,7 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
             logo_y = int(visual_center_y - (logo_h // 2))
             canvas.paste(logo_img, (logo_x, logo_y), logo_img)
             
+            lens_left_x = logo_x   # 💡 로고의 왼쪽 끝 x좌표를 렌즈 텍스트 기준점으로 저장
             current_x = logo_x + logo_w + int(spacing * 0.7)
     except: pass
 
@@ -224,11 +226,11 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
         stroke_fill=(0, 0, 0)              
     )
 
-    # 💡 카메라명 아래에 렌즈 정보 추가 (날짜와 동일 스타일)
+    # 💡 로고 왼쪽 끝에 맞춘 렌즈 정보 (날짜와 동일 스타일)
     if text_lens:
         lens_y = int(start_y + size + int(size * 0.15))
         draw.text(
-            (int(current_x), lens_y),
+            (int(lens_left_x), lens_y),
             text_lens,
             fill=(140, 140, 140),
             font=font_dat,
