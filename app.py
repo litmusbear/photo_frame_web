@@ -96,6 +96,7 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     
     text_camera = pic.get_camera()
     text_info = f"f/{pic.get_f_number()}  {pic.get_shutter()}  ISO{pic.get_iso()}"
+    text_lens = pic.get_lens() if hasattr(pic, "get_lens") else ""
     
     utc_offset_str = chosen_utc if chosen_utc else "UTC+09:00"
     text_date = ""
@@ -219,6 +220,17 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
         stroke_width=camera_stroke_width,  
         stroke_fill=(0, 0, 0)              
     )
+
+    # 💡 카메라명 아래에 렌즈 정보 추가 (날짜와 동일 스타일)
+    if text_lens:
+        lens_y = int(start_y + size + int(size * 0.15))
+        draw.text(
+            (int(current_x), lens_y),
+            text_lens,
+            fill=(140, 140, 140),
+            font=font_dat,
+            anchor="la"
+        )
     
     draw.text((int(info_x), int(start_y)), text_info, fill=(50, 50, 50), font=font_reg, anchor="ra")
 
@@ -227,6 +239,7 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
         draw.text((int(info_x), date_y), text_date, fill=(140, 140, 140), font=font_dat, anchor="ra")
 
     return canvas
+
 
 
 # 파일 업로더 컴포넌트
