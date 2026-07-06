@@ -97,8 +97,8 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     text_camera = pic.get_camera()
     text_info = f"f/{pic.get_f_number()}  {pic.get_shutter()}  ISO{pic.get_iso()}"
     text_lens = pic.get_lens() if hasattr(pic, "get_lens") else ""
-        if not text_lens:
-            text_lens = "Lens Unspecified"   # 👈 여기 문구를 취향껏 교체
+    if not text_lens:
+        text_lens = "Lens Unspecified"   # 👈 여기 문구를 취향껏 교체
 
     
     utc_offset_str = chosen_utc if chosen_utc else "UTC+09:00"
