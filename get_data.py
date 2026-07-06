@@ -198,9 +198,6 @@ def lookup_known_lens(camera_model):
 
 def get_lens(exif, camera_model=""):
     # 1순위: 유명 번들렌즈 카메라 DB 매칭
-    # → 고정렌즈 카메라는 EXIF의 LensModel이 있어도 "24.0mm f/2.8"처럼
-    #   브랜드명 없는 밋밋한 자동생성 문자열인 경우가 많아서, 
-    #   DB에 등록된 정확한 렌즈명(Elmarit 등)을 우선시합니다.
     known = lookup_known_lens(camera_model)
     if known:
         return known
@@ -208,13 +205,45 @@ def get_lens(exif, camera_model=""):
     # 2순위: EXIF LensModel (교환렌즈 카메라 등 DB에 없는 경우의 fallback)
     lens = exif.get("LensModel", "")
     if lens:
-        return lens.strip()
+        lens_str = lens.strip()
+        
+        # 💡 [핵심 수정] 렌즈명 맨 앞에 카메라 기종명(Model)이 중복으로 붙어있으면 제거합니다.
+        # 예: "iPhone 11 Pro back triple camera..." -> "back triple camera..."
+        if camera_model and lens_str.startswith(camera_model):
+            lens_str = lens_str[len(camera_model):].strip()
+            
+        return lens_str
 
     # 여기까지 왔으면 렌즈 정보를 알아낼 방법이 없음
     return ""
 
-    # 여기까지 왔으면 렌즈 정보를 알아낼 방법이 없음
-    return ""
+
+class Picture():
+    def __init__(self, image_path):
+        img = Image.open(image_path)
+        self.image_path = image_path
+        self.exif = get_exif_data(image_path)
+        self.image = ImageOps.exif_transpose(img)
+        self.camera = self.exif.get("Model", "Unknown Camera")
+        self.iso = self.exif.get("ISOSpeedRatings", "?")
+        
+        # 안전한 float 변환을 위해 처리
+        f_val = self.exif.get("FNumber", "?")
+        self.f_number = float(round(f_val, 1)) if isinstance(f_val, (int, float)) else f_val
+        
+        self.shutter = get_shutter(self.exif)
+        self.datetime = get_datetime(self.exif)
+        # 💡 주입할 때 camera_model(self.camera)을 함께 넘겨주어 내부에서 필터링하게 합니다.
+        self.lens = get_lens(self.exif, self.camera)
+
+    def get_image(self): return self.image
+    def get_camera(self): return self.camera
+    def get_iso(self): return self.iso
+    def get_f_number(self): return self.f_number
+    def get_shutter(self): return self.shutter
+    def get_datetime(self): return self.datetime
+    def get_lens(self): return self.lens
+
 
 
 class Picture():
