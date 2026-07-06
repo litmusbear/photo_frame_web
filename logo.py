@@ -1,19 +1,21 @@
 def logo(picture):
+    make = picture.exif.get("Make", "").upper()
     camera_model = picture.get_camera().upper()
     logo_file = None
-    if "LEICA" in camera_model:
+
+    if "LEICA" in make or "LEICA" in camera_model:
         logo_file = "logos/leica.png"
-    elif "NIKON" in camera_model:
+    elif "NIKON" in make or "NIKON" in camera_model:
         logo_file = "logos/nikon.png"
-    elif "SONY" in camera_model:
+    elif "SONY" in make or "SONY" in camera_model:
         logo_file = "logos/sony.png"
-    elif "CANON" in camera_model:
+    elif "CANON" in make or "CANON" in camera_model:
         logo_file = "logos/canon.png"
-    elif "IPHONE" in camera_model or "IPAD" in camera_model:
+    elif "APPLE" in make or "IPHONE" in camera_model or "IPAD" in camera_model:
         logo_file = "logos/apple.png"
-    elif "SAMSUNG" in camera_model or "SM" in camera_model:
+    elif "SAMSUNG" in make or "SAMSUNG" in camera_model or "SM" in camera_model:
         logo_file = "logos/samsung.png"
-    elif "FUJIFILM" in camera_model:
+    elif "FUJIFILM" in make or "FUJIFILM" in camera_model:
         logo_file = "logos/fujifilm.png"
 
     if not logo_file:
