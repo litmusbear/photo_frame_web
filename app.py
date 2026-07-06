@@ -13,7 +13,8 @@ except ImportError:
 
 from get_data import Picture 
 # 💡 줄바꿈 에러 해결: 한 줄로 붙어있던 코드를 두 줄로 정상 분리했습니다.
-from font import * from logo import logo 
+from font import * 
+from logo import logo 
 from border import *
 
 
