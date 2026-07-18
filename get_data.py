@@ -412,21 +412,266 @@ def lookup_known_lens(camera_model):
             return lens_spec 
     return ""
 
+import re
+from datetime import datetime 
+from PIL import Image, ImageOps 
+from PIL.ExifTags import TAGS 
+import pytz
+from timezonefinder import TimezoneFinder 
+
+# 유명 번들렌즈(고정 렌즈) 카메라 DB
+KNOWN_COMPACT_LENSES = { 
+    # --- LEICA --- 
+    "LEICA X1": "Elmarit 24mm f/2.8", 
+    "LEICA X2": "Elmarit 24mm f/2.8", 
+    "LEICA X VARIO": "Vario-Elmar 18-46mm f/3.5-6.4", 
+    "LEICA X (TYP 113)": "Summilux 23mm f/1.7", 
+    "LEICA X-U": "Summilux 23mm f/1.7", 
+    "LEICA Q": "Summilux 28mm f/1.7", 
+    "LEICA Q2": "Summilux 28mm f/1.7", 
+    "LEICA Q3": "Summilux 28mm f/1.7", 
+    "LEICA Q3 43": "APO-Summicron 43mm f/2", 
+    "LEICA D-LUX 7": "Vario-Summilux 10.9-34mm f/1.7-2.8", 
+    "LEICA D-LUX 8": "Vario-Summilux 10.9-34mm f/1.7-2.8", 
+    "LEICA C-LUX": "Leica DC Vario-Elmarit 9-72mm f/3.3-6.4", 
+    "LEICA V-LUX": "Leica DC Vario-Elmarit 9.1-146mm f/3.3-6.4", 
+    "LEICA DIGILUX": "Vario-Summicron 7-22.5mm f/2-2.4",
+
+    # --- SONY ---
+    "RX100 VII": "24-200mm f/2.8-4.5",
+    "RX100 M7": "24-200mm f/2.8-4.5",
+    "RX100 VI": "24-200mm f/2.8-4.5",
+    "RX100 M6": "24-200mm f/2.8-4.5",
+    "RX100 V": "24-70mm f/1.8-2.8",
+    "RX100 M5": "24-70mm f/1.8-2.8",
+    "RX100 IV": "24-70mm f/1.8-2.8",
+    "RX100 M4": "24-70mm f/1.8-2.8",
+    "RX100 III": "24-70mm f/1.8-2.8",
+    "RX100 M3": "24-70mm f/1.8-2.8",
+    "RX100 II": "28-100mm f/1.8-4.9",
+    "RX100 M2": "28-100mm f/1.8-4.9",
+    "RX100": "28-100mm f/1.8-4.9",
+    "RX1R II": "Sonnar 35mm f/2",
+    "RX1R": "Sonnar 35mm f/2",
+    "RX1": "Sonnar 35mm f/2",
+    "RX10 IV": "24-600mm f/2.4-4",
+    "RX10 III": "24-600mm f/2.4-4",
+    "RX10 II": "24-200mm f/2.8",
+    "RX10": "24-200mm f/2.8",
+    "ZV-1": "24-70mm f/1.8-2.8",
+    "DSC-WX": "Sony Compact Zoom",
+    "CYBER-SHOT": "Sony Compact Zoom",
+
+    # --- RICOH / PENTAX ---
+    "GR III": "GR 28mm f/2.8",
+    "GR IIIx": "GR 40mm f/2.8",
+    "GR II": "GR 28mm f/2.8",
+    "GR DIGITAL IV": "GR 28mm f/1.9",
+    "GR DIGITAL III": "GR 28mm f/1.9",
+    "GR DIGITAL": "GR 28mm f/2.8",
+    "GXR": "Ricoh GXR Mount Unit",
+    "WG-": "Ricoh Rugged Zoom",
+
+    # --- FUJIFILM ---
+    "X100V": "Fujinon 23mm f/2",
+    "X100S": "Fujinon 23mm f/2",
+    "X100F": "Fujinon 23mm f/2",
+    "X100T": "Fujinon 23mm f/2",
+    "X100VI": "Fujinon 23mm f/2",
+    "X100": "Fujinon 23mm f/2",
+    "FUJIFILM X70": "Fujinon 18.5mm f/2.8",
+    "XF10": "Fujinon 18.5mm f/2.8",
+    "X30": "Fujinon 7.1-28.4mm f/2-2.8",
+    "X20": "Fujinon 7.1-28.4mm f/2-2.8",
+    "XQ2": "Fujinon 4.4-13.2mm f/1.8-4.9",
+    "XQ1": "Fujinon 4.4-13.2mm f/1.8-4.9",
+
+    # --- CANON ---
+    "G7 X MARK III": "24-100mm f/1.8-2.8",
+    "G7 X MARK II": "24-100mm f/1.8-2.8",
+    "G7 X": "24-100mm f/1.8-2.8",
+    "G9 X MARK II": "28-84mm f/2-4.9",
+    "G9 X": "28-84mm f/2-4.9",
+    "G5 X MARK II": "24-120mm f/1.8-2.8",
+    "G5 X": "24-100mm f/1.8-2.8",
+    "G1 X MARK III": "24-72mm f/2.8-5.6",
+    "G1 X MARK II": "24-120mm f/2-3.9",
+    "G1 X": "28-112mm f/2.8-5.8",
+    "POWERSHOT S120": "24-120mm f/1.8-5.7",
+    "POWERSHOT S110": "24-120mm f/2-5.9",
+    "POWERSHOT SX": "Canon Compact Zoom",
+
+    # --- PANASONIC ---
+    "LX100 II": "Vario-Summilux 10.9-34mm f/1.7-2.8",
+    "LX100": "Vario-Summilux 10.9-34mm f/1.7-2.8",
+    "LX10": "Leica DC Vario-Summilux 24-72mm f/1.4-2.8",
+    "LX15": "Leica DC Vario-Summilux 24-72mm f/1.4-2.8",
+    "TX2": "Leica DC Vario-Elmar 24-720mm f/3.3-6.4",
+    "ZS200": "Leica DC Vario-Elmarit 24-360mm f/3.3-6.4",
+    "TZ200": "Leica DC Vario-Elmarit 24-360mm f/3.3-6.4",
+
+    # --- OLYMPUS ---
+    "STYLUS 1": "6-72mm f/2.8",
+    "XZ-2": "6-24mm f/1.8-2.5",
+    "XZ-1": "6-24mm f/1.8-2.5",
+
+    # --- 필름/토이카메라 ---
+    "CONTAX T2": "Carl Zeiss Sonnar 38mm f/2.8",
+    "CONTAX T3": "Carl Zeiss Sonnar 35mm f/2.8",
+    "OLYMPUS MJU": "Olympus Zoom 35-70mm f/3.5-5.6",
+    "OLYMPUS STYLUS EPIC": "35mm f/2.8",
+}
+
+def get_exif_data(image_path): 
+    image = Image.open(image_path) 
+    info = image._getexif() 
+    exif_dict = {}
+    if info:
+        for tag, value in info.items():
+            tag_name = TAGS.get(tag, tag)
+            exif_dict[tag_name] = value
+    return exif_dict
+
+# 모델명 앞에 브랜드가 중복되어도, 브랜드를 지워도 자연스럽게 읽히는 제조사만 여기 등록
+# (예: Canon EOS 800D -> EOS 800D 는 자연스럽지만, Leica Q2 -> Q2 는 어색함)
+BRANDS_SAFE_TO_STRIP = {
+    "CANON",       # Canon EOS 800D -> EOS 800D
+    "PANASONIC",   # Panasonic DMC-GX85 -> DMC-GX85
+    "SONY",        # SONY ILCE-7M3 -> ILCE-7M3 (원래도 중복 거의 없음)
+    "OLYMPUS",     # OLYMPUS E-M10 -> E-M10
+    "RICOH",       # RICOH GR III -> GR III (그나마 GR이라는 정체성 유지됨)
+}
+
+def clean_camera_name(exif):
+    """지워도 자연스러운 브랜드에 한해, 모델명 맨 앞의 중복된 제조사명을 제거한다.
+    라이카, 니콘처럼 모델명이 짧아 브랜드가 있어야 알아보기 쉬운 경우는 그대로 둔다."""
+    make = exif.get("Make", "")
+    model = exif.get("Model", "Unknown Camera")
+
+    if make:
+        make_keyword = make.split()[0] if make.split() else make
+        if make_keyword.upper() in BRANDS_SAFE_TO_STRIP:
+            pattern = re.compile(r"^\s*" + re.escape(make_keyword) + r"\s+", re.IGNORECASE)
+            model = pattern.sub("", model).strip()
+
+    return model
+
+def get_shutter(exif): 
+    shutter = exif.get("ExposureTime", "?") 
+    if shutter: 
+        if isinstance(shutter, tuple): 
+            shutter = shutter[0] / shutter[1]
+        if shutter < 1:
+            denom = round(1 / shutter)
+            shutter = f"1/{denom}"
+        else:
+            shutter = f"{shutter}\""
+    else:
+        shutter = "?"
+    return shutter
+
+def convert_to_degrees(value): 
+    d = float(value[0]) 
+    m = float(value[1]) 
+    s = float(value[2]) 
+    return d + (m / 60.0) + (s / 3600.0)
+
+def get_gps(exif): 
+    gps_info = exif.get("GPSInfo", {}) 
+    if not gps_info: 
+        return None
+    try:
+        lat = convert_to_degrees(gps_info[2])
+        if gps_info[1] == 'S': lat = -lat
+        lon = convert_to_degrees(gps_info[4])
+        if gps_info[3] == 'W': lon = -lon
+        return lat, lon
+    except:
+        return None
+
+def get_datetime(exif): 
+    date_str = exif.get("DateTimeOriginal", "") 
+    if not date_str: return ""
+    
+    dt = datetime.strptime(date_str, "%Y:%m:%d %H:%M:%S")
+    coords = get_gps(exif)
+    utc_offset_str = "UTC+00:00"
+
+    if coords:
+        tf = TimezoneFinder()
+        tz_name = tf.timezone_at(lat=coords[0], lng=coords[1])
+        if tz_name:
+            timezone = pytz.timezone(tz_name)
+            aware_dt = timezone.localize(dt)
+            utc_offset = aware_dt.utcoffset()
+            hours = int(utc_offset.total_seconds() / 3600)
+            minutes = int((utc_offset.total_seconds() % 3600) / 60)
+            utc_offset_str = f"UTC{'+' if hours >= 0 else ''}{hours:02d}:{abs(minutes):02d}"
+
+    return dt.strftime(f"%Y-%b-%d %H:%M {utc_offset_str}")
+
+def lookup_known_lens(camera_model): 
+    if not camera_model: 
+        return "" 
+    model_upper = camera_model.upper() 
+    for keyword, lens_spec in KNOWN_COMPACT_LENSES.items(): 
+        if keyword.upper() in model_upper: 
+            return lens_spec 
+    return ""
+
+# (주의: 파일 최상단에 import re 가 없다면 꼭 추가해 주세요!)
+
 def get_lens(exif, camera_model=""): 
+    # 1. 고정 렌즈 카메라 DB 매칭
     known = lookup_known_lens(camera_model) 
     if known: 
         return known
 
+    # 2. 메타데이터에서 렌즈 모델 가져오기
     lens = exif.get("LensModel", "")
-    if lens:
-        lens_str = lens.strip()
-        if camera_model:
-            # 대소문자 무시하고 카메라명 강제 제거 로직 적용
-            pattern = re.compile(re.escape(camera_model), re.IGNORECASE)
-            lens_str = pattern.sub("", lens_str).strip()
-            lens_str = lens_str.strip(" ,-_")
-        return lens_str
-    return ""
+    lens_str = str(lens).strip() if lens else ""
+
+    # 3. [방어 로직] LensModel이 비어 있거나 올바르지 않은 경우 (스마트폰 메타데이터 누락 대비)
+    if not lens_str or lens_str.lower() in ["none", "unknown", "?", "built-in"]:
+        focal = exif.get("FocalLength", "")
+        f_num = exif.get("FNumber", "")
+        
+        if isinstance(focal, tuple) and len(focal) == 2:
+            focal = focal[0] / focal[1]
+        if isinstance(f_num, tuple) and len(f_num) == 2:
+            f_num = f_num[0] / f_num[1]
+            
+        try:
+            if focal and f_num:
+                lens_str = f"{float(focal):.2f}mm f/{float(f_num):.1f}"
+                lens_str = lens_str.replace(".00mm", "mm").replace(".0mm", "mm")
+        except:
+            pass
+
+    if not lens_str:
+        return ""
+
+    # 4. 카메라 기종명 중복 제거
+    if camera_model:
+        pattern = re.compile(re.escape(camera_model), re.IGNORECASE)
+        lens_str = pattern.sub("", lens_str).strip()
+
+    # 5. 스마트폰 특유의 TMI 설명조 텍스트 정제 (숫자 스펙만 남기기)
+    if "camera" in lens_str.lower():
+        specs = re.findall(r'\d+(?:\.\d+)?\s*mm|\bf\/\d+(?:\.\d+)?', lens_str, re.IGNORECASE)
+        if specs:
+            lens_str = " ".join(specs).strip()
+        else:
+            lens_str = "Back Camera" if "back" in lens_str.lower() else "Built-in Camera"
+
+    # 6. 글자 수 강제 제한 (옆줄/경계선 겹침 방지)
+    # 뒤에 "@24mm"가 붙을 공간을 고려하여 최대 24자로 제한합니다.
+    max_length = 24
+    if len(lens_str) > max_length:
+        lens_str = lens_str[:max_length-3].strip() + "..."
+
+    return lens_str.strip(" ,-_")
+
 
 class Picture(): 
     def __init__(self, image_path): 
@@ -444,7 +689,23 @@ class Picture():
         
         self.shutter = get_shutter(self.exif) 
         self.datetime = get_datetime(self.exif) 
-        self.lens = get_lens(self.exif, self.camera)
+        
+        # 기본 정제된 렌즈 이름 가져오기
+        base_lens = get_lens(self.exif, self.camera)
+        
+        # 35mm 환산 화각 추출
+        eq_focal = self.exif.get("FocalLengthIn35mmFilm", "")
+        if isinstance(eq_focal, tuple) and len(eq_focal) == 2:
+            eq_focal = eq_focal[0] / eq_focal[1]
+            
+        # 렌즈 정보 뒤에 환산 화각만 깔끔하게 추가
+        if eq_focal and str(eq_focal) != "?":
+            try:
+                self.lens = f"{base_lens} @{int(float(eq_focal))}mm".strip()
+            except:
+                self.lens = base_lens
+        else:
+            self.lens = base_lens
 
     def get_image(self): return self.image
     def get_camera(self): return self.camera
