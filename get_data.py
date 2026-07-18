@@ -664,12 +664,6 @@ def get_lens(exif, camera_model=""):
         else:
             lens_str = "Back Camera" if "back" in lens_str.lower() else "Built-in Camera"
 
-    # 6. 글자 수 강제 제한 (옆줄/경계선 겹침 방지)
-    # 뒤에 "@24mm"가 붙을 공간을 고려하여 최대 24자로 제한합니다.
-    max_length = 24
-    if len(lens_str) > max_length:
-        lens_str = lens_str[:max_length-3].strip() + "..."
-
     return lens_str.strip(" ,-_")
 
 
