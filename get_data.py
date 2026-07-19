@@ -693,13 +693,19 @@ class Picture():
             eq_focal = eq_focal[0] / eq_focal[1]
             
         # 렌즈 정보 뒤에 환산 화각만 깔끔하게 추가
-        if eq_focal and str(eq_focal) != "?":
-            try:
-                self.lens = f"{base_lens} @{int(float(eq_focal))}mm".strip()
-            except:
-                self.lens = base_lens
-        else:
-            self.lens = base_lens
+        # 렌즈 정보 뒤에 환산 화각 추가 로직 (Picture 클래스 내부)
+		if eq_focal and str(eq_focal) != "?":
+    		try:
+       		focal_tag = f"@{int(float(eq_focal))}mm"
+        		if base_lens:
+            		self.lens = f"{base_lens} {focal_tag}".strip()
+        		else:
+        		self.lens = focal_tag  # 렌즈가 없으면 화각만 깔끔하게 출력 (예: "@26mm")
+    		except:
+        		self.lens = base_lens
+		else:
+    		self.lens = base_lens
+
 
     def get_image(self): return self.image
     def get_camera(self): return self.camera
