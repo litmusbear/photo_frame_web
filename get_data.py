@@ -118,19 +118,15 @@ def get_exif_data(image_path):
             exif_dict[tag_name] = value
     return exif_dict
 
-# 모델명 앞에 브랜드가 중복되어도, 브랜드를 지워도 자연스럽게 읽히는 제조사만 여기 등록
-# (예: Canon EOS 800D -> EOS 800D 는 자연스럽지만, Leica Q2 -> Q2 는 어색함)
 BRANDS_SAFE_TO_STRIP = {
-    "CANON",       # Canon EOS 800D -> EOS 800D
-    "PANASONIC",   # Panasonic DMC-GX85 -> DMC-GX85
-    "SONY",        # SONY ILCE-7M3 -> ILCE-7M3 (원래도 중복 거의 없음)
-    "OLYMPUS",     # OLYMPUS E-M10 -> E-M10
-    "RICOH",       # RICOH GR III -> GR III (그나마 GR이라는 정체성 유지됨)
+    "CANON",       
+    "PANASONIC",   
+    "SONY",        
+    "OLYMPUS",     
+    "RICOH",       
 }
 
 def clean_camera_name(exif):
-    """지워도 자연스러운 브랜드에 한해, 모델명 맨 앞의 중복된 제조사명을 제거한다.
-    라이카, 니콘처럼 모델명이 짧아 브랜드가 있어야 알아보기 쉬운 경우는 그대로 둔다."""
     make = exif.get("Make", "")
     model = exif.get("Model", "Unknown Camera")
 
@@ -205,8 +201,6 @@ def lookup_known_lens(camera_model):
             return lens_spec 
     return ""
 
-# (주의: 파일 최상단에 import re 가 없다면 꼭 추가해 주세요!)
-
 def get_lens(exif, camera_model=""): 
     # 1. 고정 렌즈 카메라 DB 매칭
     known = lookup_known_lens(camera_model) 
@@ -217,7 +211,7 @@ def get_lens(exif, camera_model=""):
     lens = exif.get("LensModel", "")
     lens_str = str(lens).strip() if lens else ""
 
-    # 3. 데이터가 비어있거나 올바르지 않으면 '정보없음' 처리를 위해 빈값 반환
+    # 3. 데이터가 비어있거나 올바르지 않으면 빈값 반환
     if not lens_str or lens_str.lower() in ["none", "unknown", "?", "built-in"]:
         return ""
 
@@ -233,12 +227,11 @@ def get_lens(exif, camera_model=""):
             lens_str = " ".join(specs).strip()
         else:
             lens_str = ""
-'''
-    # 6. 글자 수 제한
+
+    # 6. 글자 수 제한 (주석 정상 처리 및 들여쓰기 교정)
     max_length = 24
     if len(lens_str) > max_length:
         lens_str = lens_str[:max_length-3].strip() + "..."
-        '''
 
     return lens_str.strip(" ,-_")
 
@@ -268,7 +261,7 @@ class Picture():
         if isinstance(eq_focal, tuple) and len(eq_focal) == 2:
             eq_focal = eq_focal[0] / eq_focal[1]
             
-        # [핵심] 만약 환산 화각이 없다면 실제 초점거리(FocalLength)라도 가져오기
+        # 만약 환산 화각이 없다면 실제 초점거리(FocalLength) 가져오기
         if not eq_focal or str(eq_focal) == "?":
             eq_focal = self.exif.get("FocalLength", "")
             if isinstance(eq_focal, tuple) and len(eq_focal) == 2:
@@ -279,10 +272,8 @@ class Picture():
             
         # 최종 레이아웃 조립
         if base_lens:
-            # 렌즈 정보가 있으면 원래 원했던 대로 결합
             self.lens = f"{base_lens} {focal_str}".strip()
         else:
-            # 렌즈 정보가 없으면 "정보없음 @화각"으로 출력
             self.lens = f"정보없음 {focal_str}".strip()
 
     def get_image(self): return self.image
