@@ -228,11 +228,13 @@ def get_lens(exif, camera_model=""):
         else:
             lens_str = ""
 
+    '''
     # 6. 글자 수 제한 (주석 정상 처리 및 들여쓰기 교정)
     max_length = 24
     if len(lens_str) > max_length:
         lens_str = lens_str[:max_length-3].strip() + "..."
-
+    '''
+    
     return lens_str.strip(" ,-_")
 
 
