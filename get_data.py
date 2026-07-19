@@ -647,11 +647,12 @@ def get_lens(exif, camera_model=""):
             lens_str = " ".join(specs).strip()
         else:
             lens_str = ""
-
+'''
     # 6. 글자 수 제한
     max_length = 24
     if len(lens_str) > max_length:
         lens_str = lens_str[:max_length-3].strip() + "..."
+        '''
 
     return lens_str.strip(" ,-_")
 
