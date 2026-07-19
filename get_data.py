@@ -631,24 +631,8 @@ def get_lens(exif, camera_model=""):
     lens = exif.get("LensModel", "")
     lens_str = str(lens).strip() if lens else ""
 
-    # 3. [방어 로직] LensModel이 비어 있거나 올바르지 않은 경우 (스마트폰 메타데이터 누락 대비)
+    # 3. 데이터가 비어있거나 올바르지 않으면 '정보없음' 처리를 위해 빈값 반환
     if not lens_str or lens_str.lower() in ["none", "unknown", "?", "built-in"]:
-        focal = exif.get("FocalLength", "")
-        f_num = exif.get("FNumber", "")
-        
-        if isinstance(focal, tuple) and len(focal) == 2:
-            focal = focal[0] / focal[1]
-        if isinstance(f_num, tuple) and len(f_num) == 2:
-            f_num = f_num[0] / f_num[1]
-            
-        try:
-            if focal and f_num:
-                lens_str = f"{float(focal):.2f}mm f/{float(f_num):.1f}"
-                lens_str = lens_str.replace(".00mm", "mm").replace(".0mm", "mm")
-        except:
-            pass
-
-    if not lens_str:
         return ""
 
     # 4. 카메라 기종명 중복 제거
@@ -656,13 +640,18 @@ def get_lens(exif, camera_model=""):
         pattern = re.compile(re.escape(camera_model), re.IGNORECASE)
         lens_str = pattern.sub("", lens_str).strip()
 
-    # 5. 스마트폰 특유의 TMI 설명조 텍스트 정제 (숫자 스펙만 남기기)
+    # 5. 스마트폰 특유의 TMI 설명조 텍스트 정제
     if "camera" in lens_str.lower():
         specs = re.findall(r'\d+(?:\.\d+)?\s*mm|\bf\/\d+(?:\.\d+)?', lens_str, re.IGNORECASE)
         if specs:
             lens_str = " ".join(specs).strip()
         else:
-            lens_str = "Back Camera" if "back" in lens_str.lower() else "Built-in Camera"
+            lens_str = ""
+
+    # 6. 글자 수 제한
+    max_length = 24
+    if len(lens_str) > max_length:
+        lens_str = lens_str[:max_length-3].strip() + "..."
 
     return lens_str.strip(" ,-_")
 
@@ -684,7 +673,7 @@ class Picture():
         self.shutter = get_shutter(self.exif) 
         self.datetime = get_datetime(self.exif) 
         
-        # 기본 정제된 렌즈 이름 가져오기
+        # 렌즈 이름 가져오기
         base_lens = get_lens(self.exif, self.camera)
         
         # 35mm 환산 화각 추출
@@ -692,20 +681,22 @@ class Picture():
         if isinstance(eq_focal, tuple) and len(eq_focal) == 2:
             eq_focal = eq_focal[0] / eq_focal[1]
             
-        # 렌즈 정보 뒤에 환산 화각만 깔끔하게 추가
-        # 렌즈 정보 뒤에 환산 화각 추가 로직 (Picture 클래스 내부)
-		if eq_focal and str(eq_focal) != "?":
-    		try:
-       		focal_tag = f"@{int(float(eq_focal))}mm"
-        		if base_lens:
-            		self.lens = f"{base_lens} {focal_tag}".strip()
-        		else:
-        		self.lens = focal_tag  # 렌즈가 없으면 화각만 깔끔하게 출력 (예: "@26mm")
-    		except:
-        		self.lens = base_lens
-		else:
-    		self.lens = base_lens
+        # [핵심] 만약 환산 화각이 없다면 실제 초점거리(FocalLength)라도 가져오기
+        if not eq_focal or str(eq_focal) == "?":
+            eq_focal = self.exif.get("FocalLength", "")
+            if isinstance(eq_focal, tuple) and len(eq_focal) == 2:
+                eq_focal = eq_focal[0] / eq_focal[1]
 
+        # 화각 텍스트 포맷팅
+        focal_str = f"@{int(float(eq_focal))}mm" if eq_focal and str(eq_focal) != "?" else ""
+            
+        # 최종 레이아웃 조립
+        if base_lens:
+            # 렌즈 정보가 있으면 원래 원했던 대로 결합
+            self.lens = f"{base_lens} {focal_str}".strip()
+        else:
+            # 렌즈 정보가 없으면 "정보없음 @화각"으로 출력
+            self.lens = f"정보없음 {focal_str}".strip()
 
     def get_image(self): return self.image
     def get_camera(self): return self.camera
