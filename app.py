@@ -360,9 +360,9 @@ if uploaded_files:
 
             buf = io.BytesIO()
             if exif_bytes:
-                final_canvas.save(buf, format="JPEG", quality=100, subsampling=0, exif=exif_bytes)
+                final_canvas.save(buf, format="JPEG", quality=95, exif=exif_bytes)
             else:
-                final_canvas.save(buf, format="JPEG", quality=100, subsampling=0)
+                final_canvas.save(buf, format="JPEG", quality=95)
 
             st.download_button(
                 label=f"📥 {uploaded_file.name} 저장",
