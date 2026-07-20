@@ -228,13 +228,6 @@ def get_lens(exif, camera_model=""):
         else:
             lens_str = ""
 
-    '''
-    # 6. 글자 수 제한 (주석 정상 처리 및 들여쓰기 교정)
-    max_length = 24
-    if len(lens_str) > max_length:
-        lens_str = lens_str[:max_length-3].strip() + "..."
-    '''
-    
     return lens_str.strip(" ,-_")
 
 
@@ -248,35 +241,34 @@ class Picture():
         self.iso = self.exif.get("ISOSpeedRatings", "?") 
         
         f_val = self.exif.get("FNumber", "?")
-        if isinstance(f_val, tuple) and len(f_val) == 2:
+        if isinstance(f_val, tuple) and len(f_val) == 2 and f_val[1] != 0:
             f_val = f_val[0] / f_val[1]
         self.f_number = float(round(f_val, 1)) if isinstance(f_val, (int, float)) else f_val
         
         self.shutter = get_shutter(self.exif) 
         self.datetime = get_datetime(self.exif) 
         
-        # 렌즈 이름 가져오기
-        base_lens = get_lens(self.exif, self.camera)
-        
-        # 35mm 환산 화각 추출
+        # 35mm 환산 화각 추출 (없으면 실제 FocalLength)
         eq_focal = self.exif.get("FocalLengthIn35mmFilm", "")
-        if isinstance(eq_focal, tuple) and len(eq_focal) == 2:
-            eq_focal = eq_focal[0] / eq_focal[1]
-            
-        # 만약 환산 화각이 없다면 실제 초점거리(FocalLength) 가져오기
         if not eq_focal or str(eq_focal) == "?":
             eq_focal = self.exif.get("FocalLength", "")
-            if isinstance(eq_focal, tuple) and len(eq_focal) == 2:
-                eq_focal = eq_focal[0] / eq_focal[1]
 
-        # 화각 텍스트 포맷팅
-        focal_str = f"@{int(float(eq_focal))}mm" if eq_focal and str(eq_focal) != "?" else ""
-            
-        # 최종 레이아웃 조립
+        if isinstance(eq_focal, tuple) and len(eq_focal) == 2 and eq_focal[1] != 0:
+            eq_focal = eq_focal[0] / eq_focal[1]
+
+        # 화각 텍스트 추출 (0mm거나 없으면 빈값 처리)
+        try:
+            fval = int(float(eq_focal))
+            self.focal_length = f"{fval}mm" if fval > 0 else ""
+        except:
+            self.focal_length = ""
+
+        # 렌즈 이름 지정 (한글 대신 영문 사용으로 네모 깨짐 완전 방지)
+        base_lens = get_lens(self.exif, self.camera)
         if base_lens:
-            self.lens = f"{base_lens} {focal_str}".strip()
+            self.lens = base_lens
         else:
-            self.lens = f"Lens Unspecified {focal_str}".strip()
+            self.lens = "Manual Lens"
 
     def get_image(self): return self.image
     def get_camera(self): return self.camera
@@ -285,3 +277,4 @@ class Picture():
     def get_shutter(self): return self.shutter
     def get_datetime(self): return self.datetime
     def get_lens(self): return self.lens
+    def get_focal_length(self): return self.focal_length
