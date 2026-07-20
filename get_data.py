@@ -1,4 +1,4 @@
-Import re
+import re
 from datetime import datetime 
 from PIL import Image, ImageOps 
 from PIL.ExifTags import TAGS 
