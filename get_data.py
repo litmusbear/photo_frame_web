@@ -276,7 +276,7 @@ class Picture():
         if base_lens:
             self.lens = f"{base_lens} {focal_str}".strip()
         else:
-            self.lens = f"정보없음 {focal_str}".strip()
+            self.lens = f"Lens Unspecified {focal_str}".strip()
 
     def get_image(self): return self.image
     def get_camera(self): return self.camera
