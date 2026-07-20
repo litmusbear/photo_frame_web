@@ -102,7 +102,7 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     exposure = f"f/{pic.get_f_number()}  {pic.get_shutter()}  ISO{pic.get_iso()}"
     
     if focal:
-        text_info = f"{focal}  |  {exposure}"
+        text_info = f"{focal} | {exposure}"
     else:
         text_info = exposure
 
