@@ -1,4 +1,4 @@
-import re
+Import re
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
 import uuid
@@ -96,15 +96,7 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     draw = ImageDraw.Draw(canvas)
     
     text_camera = pic.get_camera()
-    
-    # 💡 [화각 + 노출 삼요소 조합]
-    focal = pic.get_focal_length() if hasattr(pic, "get_focal_length") else ""
-    exposure = f"f/{pic.get_f_number()}  {pic.get_shutter()}  ISO{pic.get_iso()}"
-    
-    if focal:
-        text_info = f"{focal} | {exposure}"
-    else:
-        text_info = exposure
+    text_info = f"f/{pic.get_f_number()}  {pic.get_shutter()}  ISO{pic.get_iso()}"
 
     text_lens = pic.get_lens() if hasattr(pic, "get_lens") else ""
 
@@ -113,7 +105,7 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
         text_lens = re.sub(r'[\x00-\x1F\x7F-\x9F]', '', text_lens)
 
     if not text_lens:
-        text_lens = "Manual Lens"
+        text_lens = "Lens Unspecified"
 
     
     utc_offset_str = chosen_utc if chosen_utc else "UTC+09:00"
@@ -183,6 +175,7 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     line_spacing = int(size * 0.2)
     
     # 💡 [오리지널 패딩 보존 + 글자 크기 비례 간격 튜닝]
+    # 전체 패딩(p) 내에서 커진 폰트 크기에 어울리도록 여백 시작점을 잡아줍니다.
     if w > h:
         gap = int(p * 0.12)  
         start_y = h + t + gap
@@ -193,7 +186,7 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
     
     spacing = int(w * 0.01)
     current_x = t
-    lens_left_x = t   # 로고 왼쪽 끝 기준점
+    lens_left_x = t   # 💡 로고 왼쪽 끝 기준점 (기본값: 로고 없을 때는 t와 동일)
 
     try:
         if l_file and os.path.exists(l_file):
@@ -206,7 +199,7 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
             logo_y = int(visual_center_y - (logo_h // 2))
             canvas.paste(logo_img, (logo_x, logo_y), logo_img)
             
-            lens_left_x = logo_x   
+            lens_left_x = logo_x   # 💡 로고의 왼쪽 끝 x좌표를 렌즈 텍스트 기준점으로 저장
             current_x = logo_x + logo_w + int(spacing * 0.7)
     except: pass
 
@@ -225,6 +218,7 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
         if scale_factor < 0.8:
             camera_stroke_width = max(1, int(new_size * 0.03))
     elif w > h:
+        # 커진 size 밸런스에 맞춰 최종 폰트 객체 매핑
         font_obj = create_custom_font(size, is_bold=True)
         font_reg = create_custom_font(int(size * 0.85), is_bold=False)
         font_dat = create_custom_font(int(size * 0.65), is_bold=False)
@@ -239,7 +233,7 @@ def place_model(canvas, pic, w, h, t, p, l_file, chosen_utc=None, current_path=N
         stroke_fill=(0, 0, 0)              
     )
 
-    # 💡 로고 왼쪽 끝에 맞춘 렌즈 정보
+    # 💡 로고 왼쪽 끝에 맞춘 렌즈 정보 (날짜와 동일 스타일)
     if text_lens:
         lens_y = int(start_y + size + int(size * 0.15))
         draw.text(
@@ -287,23 +281,26 @@ if uploaded_files:
             if image is None:
                 raise ValueError("이미지를 읽을 수 없습니다.")
 
-            # 🔍 디버그 정보
+            # 🔍 디버그: 렌즈 EXIF 값 확인용 (확인 끝나면 이 블록 삭제하세요)
+                        # 🔍 디버그: 렌즈 + 카메라명 EXIF 값 확인용 (확인 끝나면 이 블록 삭제하세요)
             with st.expander(f"🔍 디버그 정보 - {uploaded_file.name}"):
                 st.write("Make (원본 EXIF):", repr(picture.exif.get("Make")))
                 st.write("Model (원본 EXIF):", repr(picture.exif.get("Model")))
                 st.write("get_camera() 결과:", repr(picture.get_camera()))
                 st.write("LensModel (원본 EXIF):", repr(picture.exif.get("LensModel")))
+                st.write("LensSpecification (원본 EXIF):", repr(picture.exif.get("LensSpecification")))
                 st.write("get_lens() 결과:", repr(picture.get_lens()))
-                st.write("get_focal_length() 결과:", repr(picture.get_focal_length() if hasattr(picture, "get_focal_length") else "N/A"))
+                st.write("전체 EXIF 키 목록:", list(picture.exif.keys()))
                 
             width, height = image.size
             
+            # 💡 [오리지널 패딩 연산 100% 보존]
             thickness = get_thickness(height)
             padding = get_padding(height)
                 
             logo_file = logo(picture)
 
-            st.subheader(f"🖼️ 파일: {uploaded_file.name}")
+            st.subheader(f"🖼️ 파일: {uploaded_files.name if hasattr(uploaded_files, 'name') else uploaded_file.name}")
             
             show_timezone_selector = True 
             
